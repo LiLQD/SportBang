@@ -1,0 +1,33 @@
+node_modules/
+**/node_modules/
+
+# env
+.env
+**/.env
+.env.local
+.env.*.local
+
+# logs
+logs/
+*.log
+
+# build output
+dist/
+build/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+.expo/
+.expo-shared/
+web-build/
+
+coverage/
+
+# temp
+tmp/
+temp/
