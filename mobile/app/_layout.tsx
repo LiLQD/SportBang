@@ -1,26 +1,19 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { Stack } from "expo-router";
 import { Provider as PaperProvider } from "react-native-paper";
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { useAuthStore } from "@/src/store/auth.store";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const token = useAuthStore((s) => s.token);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-    <PaperProvider><Stack screenOptions={{ headerShown: false }} /></PaperProvider>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <PaperProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        {token ? (
+          <Stack.Screen name="(tabs)" />
+        ) : (
+          <Stack.Screen name="(auth)" />
+        )}
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </PaperProvider>
   );
 }
