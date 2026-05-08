@@ -45,14 +45,24 @@ const createBooking = async (user, payload) => {
   const date = new Date(booking_date);
   date.setUTCHours(0, 0, 0, 0);
 
+  // Helper to ensure HH:mm padding for safe string comparison in DB
+  const padTime = (time) => {
+    if (!time) return time;
+    const [h, m] = time.split(':');
+    return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+  };
+
+  const formattedStart = padTime(booking_slot.start);
+  const formattedEnd = padTime(booking_slot.end);
+
   // 3. Double booking validation
   // Prevent double booking: same field, same date, overlapping time, not cancelled
   const overlappingBooking = await Booking.findOne({
     field_id,
     booking_date: date,
     status: { $ne: 'cancelled' },
-    'booking_slot.start': { $lt: booking_slot.end },
-    'booking_slot.end': { $gt: booking_slot.start }
+    'booking_slot.start': { $lt: formattedEnd },
+    'booking_slot.end': { $gt: formattedStart }
   });
 
   if (overlappingBooking) {
