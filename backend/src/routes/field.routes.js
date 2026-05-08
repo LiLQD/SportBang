@@ -12,4 +12,9 @@ router.post('/', protect, authorize('owner', 'admin'), fieldController.createFie
 router.put('/:id', protect, authorize('owner', 'admin'), fieldController.updateField);
 router.patch('/:id/status', protect, authorize('owner', 'admin'), fieldController.updateFieldStatus);
 
+// Slot management
+router.post('/:id/slots', protect, authorize('owner', 'admin'), fieldController.addSlot);
+router.put('/:id/slots/:slotId', protect, authorize('owner', 'admin'), fieldController.updateSlot);
+router.delete('/:id/slots/:slotId', protect, authorize('owner', 'admin'), fieldController.deleteSlot);
+
 module.exports = router;

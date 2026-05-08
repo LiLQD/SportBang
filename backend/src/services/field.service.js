@@ -103,10 +103,59 @@ const updateFieldStatus = async (fieldId, status, user) => {
   return await field.save();
 };
 
+const addSlot = async (fieldId, slotData, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) throw new Error('Field not found');
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to manage slots for this field');
+  }
+
+  field.available_time.push(slotData);
+  validateSlots(field.available_time);
+  
+  return await field.save();
+};
+
+const updateSlot = async (fieldId, slotId, slotData, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) throw new Error('Field not found');
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to manage slots for this field');
+  }
+
+  const slot = field.available_time.id(slotId);
+  if (!slot) throw new Error('Slot not found');
+
+  if (slotData.start) slot.start = slotData.start;
+  if (slotData.end) slot.end = slotData.end;
+
+  validateSlots(field.available_time);
+  
+  return await field.save();
+};
+
+const deleteSlot = async (fieldId, slotId, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) throw new Error('Field not found');
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to manage slots for this field');
+  }
+
+  field.available_time.pull(slotId);
+  
+  return await field.save();
+};
+
 module.exports = {
   getAllFields,
   getFieldById,
   createField,
   updateField,
-  updateFieldStatus
+  updateFieldStatus,
+  addSlot,
+  updateSlot,
+  deleteSlot
 };

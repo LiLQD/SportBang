@@ -50,10 +50,40 @@ const updateFieldStatus = async (req, res) => {
   }
 };
 
+const addSlot = async (req, res) => {
+  try {
+    const field = await fieldService.addSlot(req.params.id, req.body, req.user);
+    return sendResponse(res, 201, true, 'Slot added successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const updateSlot = async (req, res) => {
+  try {
+    const field = await fieldService.updateSlot(req.params.id, req.params.slotId, req.body, req.user);
+    return sendResponse(res, 200, true, 'Slot updated successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const deleteSlot = async (req, res) => {
+  try {
+    const field = await fieldService.deleteSlot(req.params.id, req.params.slotId, req.user);
+    return sendResponse(res, 200, true, 'Slot deleted successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 module.exports = {
   getAllFields,
   getFieldById,
   createField,
   updateField,
-  updateFieldStatus
+  updateFieldStatus,
+  addSlot,
+  updateSlot,
+  deleteSlot
 };

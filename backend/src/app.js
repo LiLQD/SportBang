@@ -3,6 +3,10 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/auth.routes');
 const fieldRoutes = require('./routes/field.routes');
+const bookingRoutes = require('./routes/booking.routes');
+const paymentRoutes = require('./routes/payment.routes');
+const ownerRoutes = require('./routes/owner.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -11,6 +15,10 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/fields', fieldRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/owner', ownerRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
