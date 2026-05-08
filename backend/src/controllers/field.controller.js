@@ -50,6 +50,16 @@ const updateFieldStatus = async (req, res) => {
   }
 };
 
+const deleteField = async (req, res) => {
+  try {
+    const field = await fieldService.deleteField(req.params.id, req.user);
+    return sendResponse(res, 200, true, 'Field deleted successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+
 const addSlot = async (req, res) => {
   try {
     const field = await fieldService.addSlot(req.params.id, req.body, req.user);
@@ -108,6 +118,7 @@ module.exports = {
   createField,
   updateField,
   updateFieldStatus,
+  deleteField,
   addSlot,
   updateSlot,
   deleteSlot,

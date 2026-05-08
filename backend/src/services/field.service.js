@@ -103,6 +103,21 @@ const updateFieldStatus = async (fieldId, status, user) => {
   return await field.save();
 };
 
+const deleteField = async (fieldId, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) {
+    throw new Error('Field not found');
+  }
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to delete this field');
+  }
+
+  field.isDeleted = true;
+  return await field.save();
+};
+
+
 const addSlot = async (fieldId, slotData, user) => {
   const field = await Field.findById(fieldId);
   if (!field || field.isDeleted) throw new Error('Field not found');
@@ -182,6 +197,7 @@ module.exports = {
   createField,
   updateField,
   updateFieldStatus,
+  deleteField,
   addSlot,
   updateSlot,
   deleteSlot,

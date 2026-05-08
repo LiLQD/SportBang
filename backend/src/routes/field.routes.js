@@ -12,6 +12,7 @@ router.get('/:id', optionalProtect, fieldController.getFieldById);
 router.post('/', protect, authorize('owner', 'admin'), fieldController.createField);
 router.put('/:id', protect, authorize('owner', 'admin'), fieldController.updateField);
 router.patch('/:id/status', protect, authorize('owner', 'admin'), fieldController.updateFieldStatus);
+router.delete('/:id', protect, authorize('owner', 'admin'), fieldController.deleteField);
 
 // Slot management
 router.post('/:id/slots', protect, authorize('owner', 'admin'), fieldController.addSlot);
