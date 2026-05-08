@@ -1,31 +1,62 @@
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
-  FlatList,
-  Image,
   TouchableOpacity,
+  TextInput,
+  Image,
   ScrollView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
-const fields = [
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+
+const categories = [
+  "Football",
+  "Badminton",
+  "Tennis",
+  "Basketball",
+];
+
+const featuredFields = [
   {
     id: "1",
-    name: "Riverside Football Stadium",
-    location: "Downtown, 2.5 km",
+    name: "Premier Stadium",
+    image:
+      "https://images.unsplash.com/photo-1600130202712-fd01014ffa79",
     rating: 4.8,
-    price: 45,
-    image: "https://images.unsplash.com/photo-1734652246537-104c43a68942",
+    price: 50,
   },
+
   {
     id: "2",
-    name: "Elite Soccer Arena",
-    location: "North District, 3.2 km",
+    name: "Elite Badminton Court",
+    image:
+      "https://images.unsplash.com/photo-1776999035766-9c2b5cddf613",
     rating: 4.9,
-    price: 55,
-    image: "https://images.unsplash.com/photo-1641280173256-0ac1b2f4cd78",
+    price: 30,
+  },
+];
+
+const nearbyFields = [
+  {
+    id: "3",
+    name: "City Sports Arena",
+    image:
+      "https://images.unsplash.com/photo-1705593813682-033ee2991df6",
+    rating: 4.6,
+    price: 45,
+    distance: "1.2 km",
+  },
+
+  {
+    id: "4",
+    name: "Green Field Stadium",
+    image:
+      "https://images.unsplash.com/photo-1729843352938-0e10fbf96585",
+    rating: 4.5,
+    price: 35,
+    distance: "2.5 km",
   },
 ];
 
@@ -34,47 +65,160 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
-        <Text style={styles.title}>Find Your Field</Text>
-        <Text style={styles.subtitle}>
-          Book sports facilities near you
-        </Text>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.helloText}>
+                Hello,
+              </Text>
 
-        {/* Search */}
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#999" />
-          <TextInput
-            placeholder="Search field..."
-            style={styles.input}
-          />
+              <Text style={styles.userName}>
+                User
+              </Text>
+            </View>
+
+            <View style={styles.avatar}>
+              <Ionicons
+                name="person"
+                size={28}
+                color="#22C55E"
+              />
+            </View>
+          </View>
+
+          {/* SEARCH */}
+          <View style={styles.searchBox}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#9CA3AF"
+            />
+
+            <TextInput
+              placeholder="Find sports fields..."
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+            />
+          </View>
         </View>
 
-        {/* List */}
-        {fields.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.image} />
+        {/* CATEGORY */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryContainer}
+        >
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={styles.categoryButton}
+            >
+              <Text style={styles.categoryText}>
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-            <View style={styles.cardContent}>
-              <Text style={styles.name}>{item.name}</Text>
+        {/* FEATURED */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Featured Fields
+          </Text>
 
-              <View style={styles.row}>
-                <Ionicons name="location-outline" size={16} />
-                <Text style={styles.location}>{item.location}</Text>
-              </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {featuredFields.map((field) => (
+              <TouchableOpacity
+                key={field.id}
+                style={styles.featuredCard}
+                onPress={() =>
+                  router.push(`/field/${field.id}`)
+                }
+              >
+                <Image
+                  source={{ uri: field.image }}
+                  style={styles.featuredImage}
+                />
 
-              <View style={styles.rowBetween}>
-                <View style={styles.row}>
-                  <Ionicons name="star" size={16} color="gold" />
-                  <Text>{item.rating}</Text>
+                <View style={styles.cardContent}>
+                  <Text style={styles.fieldName}>
+                    {field.name}
+                  </Text>
+
+                  <View style={styles.rowBetween}>
+                    <View style={styles.row}>
+                      <Ionicons
+                        name="star"
+                        size={16}
+                        color="#FACC15"
+                      />
+
+                      <Text>{field.rating}</Text>
+                    </View>
+
+                    <Text style={styles.price}>
+                      ${field.price}/h
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* NEARBY */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Nearby Fields
+          </Text>
+
+          {nearbyFields.map((field) => (
+            <TouchableOpacity
+              key={field.id}
+              style={styles.nearbyCard}
+              onPress={() =>
+                router.push(`/field/${field.id}`)
+              }
+            >
+              <Image
+                source={{ uri: field.image }}
+                style={styles.nearbyImage}
+              />
+
+              <View style={styles.nearbyContent}>
+                <View>
+                  <Text style={styles.fieldName}>
+                    {field.name}
+                  </Text>
+
+                  <Text style={styles.distance}>
+                    {field.distance}
+                  </Text>
                 </View>
 
-                <Text style={styles.price}>
-                  ${item.price}/h
-                </Text>
+                <View style={styles.rowBetween}>
+                  <View style={styles.row}>
+                    <Ionicons
+                      name="star"
+                      size={16}
+                      color="#FACC15"
+                    />
+
+                    <Text>{field.rating}</Text>
+                  </View>
+
+                  <Text style={styles.price}>
+                    ${field.price}/h
+                  </Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))}
+        </View>
 
       </ScrollView>
     </View>
@@ -82,44 +226,171 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5", padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
 
-  title: { fontSize: 24, fontWeight: "bold" },
-  subtitle: { color: "#666", marginBottom: 16 },
+  header: {
+    backgroundColor: "#22C55E",
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
 
-  searchBox: {
+  headerTop: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+
+  helloText: {
+    color: "#DCFCE7",
+    fontSize: 14,
+  },
+
+  userName: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 16,
+    justifyContent: "center",
     alignItems: "center",
   },
 
-  input: { marginLeft: 10, flex: 1 },
-
-  card: {
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: "hidden",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 54,
   },
 
-  image: { width: "100%", height: 150 },
+  input: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+  },
 
-  cardContent: { padding: 12 },
+  categoryContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 12,
+  },
 
-  name: { fontWeight: "bold", marginBottom: 6 },
+  categoryButton: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    marginRight: 12,
 
-  row: { flexDirection: "row", alignItems: "center", gap: 5 },
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+
+  categoryText: {
+    fontWeight: "600",
+    color: "#374151",
+  },
+
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 16,
+    color: "#111827",
+  },
+
+  featuredCard: {
+    width: 280,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    overflow: "hidden",
+    marginRight: 16,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  featuredImage: {
+    width: "100%",
+    height: 170,
+  },
+
+  cardContent: {
+    padding: 16,
+  },
+
+  fieldName: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 10,
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
 
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    alignItems: "center",
   },
 
-  location: { color: "#666" },
+  price: {
+    color: "#22C55E",
+    fontWeight: "700",
+    fontSize: 15,
+  },
 
-  price: { color: "blue", fontWeight: "bold" },
+  nearbyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    overflow: "hidden",
+    flexDirection: "row",
+    marginBottom: 16,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  nearbyImage: {
+    width: 110,
+    height: 110,
+  },
+
+  nearbyContent: {
+    flex: 1,
+    padding: 14,
+    justifyContent: "space-between",
+  },
+
+  distance: {
+    color: "#6B7280",
+    marginTop: 4,
+  },
 });
