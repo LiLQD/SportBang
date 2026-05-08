@@ -1,0 +1,15 @@
+const express = require('express');
+const router = express.Router();
+const fieldController = require('../controllers/field.controller');
+const { protect, authorize, optionalProtect } = require('../middleware/auth.middleware');
+
+// Public routes with optional user for filtering
+router.get('/', optionalProtect, fieldController.getAllFields);
+router.get('/:id', optionalProtect, fieldController.getFieldById);
+
+// Protected routes (Owner and Admin only)
+router.post('/', protect, authorize('owner', 'admin'), fieldController.createField);
+router.put('/:id', protect, authorize('owner', 'admin'), fieldController.updateField);
+router.patch('/:id/status', protect, authorize('owner', 'admin'), fieldController.updateFieldStatus);
+
+module.exports = router;
