@@ -149,6 +149,33 @@ const deleteSlot = async (fieldId, slotId, user) => {
   return await field.save();
 };
 
+const addImages = async (fieldId, files, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) throw new Error('Field not found');
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to upload images for this field');
+  }
+
+  const imagePaths = files.map(file => `/uploads/${file.filename}`);
+  field.images.push(...imagePaths);
+
+  return await field.save();
+};
+
+const removeImage = async (fieldId, imagePath, user) => {
+  const field = await Field.findById(fieldId);
+  if (!field || field.isDeleted) throw new Error('Field not found');
+
+  if (user.role !== 'admin' && field.owner_id.toString() !== user.id.toString()) {
+    throw new Error('Not authorized to manage images for this field');
+  }
+
+  field.images = field.images.filter(img => img !== imagePath);
+
+  return await field.save();
+};
+
 module.exports = {
   getAllFields,
   getFieldById,
@@ -157,5 +184,7 @@ module.exports = {
   updateFieldStatus,
   addSlot,
   updateSlot,
-  deleteSlot
+  deleteSlot,
+  addImages,
+  removeImage
 };

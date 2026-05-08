@@ -77,6 +77,31 @@ const deleteSlot = async (req, res) => {
   }
 };
 
+const uploadImages = async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return sendResponse(res, 400, false, 'No images uploaded');
+    }
+    const field = await fieldService.addImages(req.params.id, req.files, req.user);
+    return sendResponse(res, 200, true, 'Images uploaded successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const deleteImage = async (req, res) => {
+  try {
+    const { image_path } = req.body;
+    if (!image_path) {
+      return sendResponse(res, 400, false, 'image_path is required');
+    }
+    const field = await fieldService.removeImage(req.params.id, image_path, req.user);
+    return sendResponse(res, 200, true, 'Image removed successfully', field);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 module.exports = {
   getAllFields,
   getFieldById,
@@ -85,5 +110,7 @@ module.exports = {
   updateFieldStatus,
   addSlot,
   updateSlot,
-  deleteSlot
+  deleteSlot,
+  uploadImages,
+  deleteImage
 };

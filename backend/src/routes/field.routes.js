@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fieldController = require('../controllers/field.controller');
 const { protect, authorize, optionalProtect } = require('../middleware/auth.middleware');
+const upload = require('../middleware/upload.middleware');
 
 // Public routes with optional user for filtering
 router.get('/', optionalProtect, fieldController.getAllFields);
@@ -17,4 +18,9 @@ router.post('/:id/slots', protect, authorize('owner', 'admin'), fieldController.
 router.put('/:id/slots/:slotId', protect, authorize('owner', 'admin'), fieldController.updateSlot);
 router.delete('/:id/slots/:slotId', protect, authorize('owner', 'admin'), fieldController.deleteSlot);
 
+// Image management
+router.post('/:id/images', protect, authorize('owner', 'admin'), upload.array('images', 10), fieldController.uploadImages);
+router.delete('/:id/images', protect, authorize('owner', 'admin'), fieldController.deleteImage);
+
 module.exports = router;
+
