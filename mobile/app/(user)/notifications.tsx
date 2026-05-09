@@ -393,10 +393,19 @@ const styles = StyleSheet.create({
   },
 
   categoryButton: {
-    backgroundColor: "#F3F4F6",
     paddingHorizontal: 18,
     paddingVertical: 10,
+
     borderRadius: 999,
+
+    backgroundColor: "#F3F4F6",
+
+    marginRight: 10,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    minHeight: 42,
   },
 
   activeCategoryButton: {

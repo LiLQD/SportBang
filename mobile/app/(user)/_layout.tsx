@@ -14,15 +14,7 @@ export default function UserLayout() {
           height: 70,
           paddingBottom: 8,
           paddingTop: 8,
-          backgroundColor: "#FFFFFF",
-
-          borderTopWidth: 1,
-          borderTopColor: "#E5E7EB",
-        },
-
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
+          backgroundColor: "#fff",
         },
       }}
     >
@@ -47,7 +39,7 @@ export default function UserLayout() {
       <Tabs.Screen
         name="booking"
         options={{
-          title: "Bookings",
+          title: "Booking",
 
           tabBarIcon: ({ color, size }) => (
             <Ionicons
@@ -63,7 +55,7 @@ export default function UserLayout() {
       <Tabs.Screen
         name="notification"
         options={{
-          title: "Notifications",
+          title: "Notification",
 
           tabBarIcon: ({ color, size }) => (
             <Ionicons
