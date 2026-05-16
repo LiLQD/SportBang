@@ -6,24 +6,68 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  FlatList,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { fieldService } from "@/src/services/field.service";
+import { reviewService } from "@/src/services/review.service";
+import { favoriteService } from "@/src/services/favorite.service";
+import { useAuthStore } from "@/src/store/auth.store";
 
 const { width } = Dimensions.get("window");
 
 export default function FieldDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { darkMode } = useAuthStore();
 
+  const [field, setField] = useState<any>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const fieldImages = [
-    "https://images.unsplash.com/photo-1716745559715-282bb61e3012",
-    "https://images.unsplash.com/photo-1760384702320-a7409c8b4f37",
-    "https://images.unsplash.com/photo-1758535013088-20f84ac4c645",
-    "https://images.unsplash.com/photo-1729433939211-458edc336757",
-  ];
+  useEffect(() => {
+    if (id) {
+      fetchFieldData();
+    }
+  }, [id]);
+
+  const fetchFieldData = async () => {
+    try {
+      setLoading(true);
+      const [fieldRes, reviewRes, favRes] = await Promise.all([
+        fieldService.getFieldById(id),
+        reviewService.getFieldReviews(id),
+        favoriteService.getFavorites()
+      ]);
+
+      // Trích xuất data từ structure { success, message, data }
+      if (fieldRes && fieldRes.data) {
+        setField(fieldRes.data);
+      }
+
+      if (reviewRes && reviewRes.data && Array.isArray(reviewRes.data)) {
+        setReviews(reviewRes.data);
+      } else {
+        setReviews([]);
+      }
+
+      // Kiểm tra xem sân này có trong danh sách yêu thích không
+      if (favRes && favRes.data && Array.isArray(favRes.data)) {
+        const isFav = favRes.data.some((f: any) => f._id === id);
+        setIsFavorite(isFav);
+      }
+    } catch (error) {
+      console.error("Error fetching field data:", error);
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const amenities = [
     {
@@ -52,10 +96,13 @@ export default function FieldDetailScreen() {
     },
   ];
 
-  const handleFavorite = () => {
-    setIsFavorite(!isFavorite);
-
-    // sau này có thể lưu vào AsyncStorage / API
+  const handleFavorite = async () => {
+    try {
+      await favoriteService.toggleFavorite(id);
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
   };
 
   const handleBooking = () => {
@@ -65,8 +112,31 @@ export default function FieldDetailScreen() {
     });
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, darkMode && { backgroundColor: "#111827" }, { justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color="#22C55E" />
+      </View>
+    );
+  }
+
+  if (!field) {
+    return (
+      <View style={[styles.container, darkMode && { backgroundColor: "#111827" }, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={darkMode && { color: "#fff" }}>Không tìm thấy sân bóng</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={{ color: "#22C55E", marginTop: 10 }}>Quay lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const fieldImages = field.images?.length > 0 ? field.images : [
+    "https://images.unsplash.com/photo-1716745559715-282bb61e3012",
+  ];
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -79,7 +149,7 @@ export default function FieldDetailScreen() {
           pagingEnabled
           showsHorizontalScrollIndicator={false}
         >
-          {fieldImages.map((img, index) => (
+          {fieldImages.map((img: string, index: number) => (
             <Image
               key={index}
               source={{ uri: img }}
@@ -88,12 +158,20 @@ export default function FieldDetailScreen() {
           ))}
         </ScrollView>
 
+        {/* BACK BUTTON */}
+        <TouchableOpacity
+          style={[styles.backIconBtn, darkMode && { backgroundColor: "#1F2937" }]}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color={darkMode ? "#fff" : "#111827"} />
+        </TouchableOpacity>
+
         {/* CONTENT */}
         <View style={styles.content}>
-          {/* TITLE */}
+          {/* TITLE SECTION */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>
-              Champions Arena
+            <Text style={[styles.title, darkMode && { color: "#fff" }]}>
+              {field.field_name}
             </Text>
 
             <View style={styles.ratingRow}>
@@ -103,12 +181,12 @@ export default function FieldDetailScreen() {
                 color="#FACC15"
               />
 
-              <Text style={styles.rating}>
-                4.8
+              <Text style={[styles.rating, darkMode && { color: "#fff" }]}>
+                {field.users_rate || "5.0"}
               </Text>
 
-              <Text style={styles.review}>
-                (234 reviews)
+              <Text style={[styles.review, darkMode && { color: "#9CA3AF" }]}>
+                ({field.reviewCount || 0} reviews)
               </Text>
             </View>
           </View>
@@ -119,16 +197,16 @@ export default function FieldDetailScreen() {
               <Ionicons
                 name="location-outline"
                 size={20}
-                color="#6B7280"
+                color="#22C55E"
               />
 
               <View>
-                <Text style={styles.addressTitle}>
-                  123 Stadium Avenue
+                <Text style={[styles.addressTitle, darkMode && { color: "#fff" }]}>
+                  {field.address}
                 </Text>
 
-                <Text style={styles.addressSub}>
-                  Downtown, CA 94102
+                <Text style={[styles.addressSub, darkMode && { color: "#9CA3AF" }]}>
+                  {field.location?.city || "Hà Nội"}
                 </Text>
               </View>
             </View>
@@ -145,70 +223,98 @@ export default function FieldDetailScreen() {
           {/* PRICE */}
           <View style={styles.priceRow}>
             <Text style={styles.price}>
-              $45
+              {field.price_per_hour?.toLocaleString('vi-VN')}đ
             </Text>
 
-            <Text style={styles.perHour}>
+            <Text style={[styles.perHour, darkMode && { color: "#9CA3AF" }]}>
               / hour
             </Text>
           </View>
 
           {/* ABOUT */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
               About this field
             </Text>
 
-            <Text style={styles.description}>
-              Champions Arena is a premium indoor
-              football facility featuring
-              professional-grade artificial turf and
-              modern lighting systems. Perfect for
-              training sessions, friendly matches,
-              and tournament play.
+            <Text style={[styles.description, darkMode && { color: "#D1D5DB" }]}>
+              {field.description || "No description provided."}
             </Text>
           </View>
 
           {/* AMENITIES */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
               Amenities
             </Text>
 
             <View style={styles.amenitiesGrid}>
-              {amenities.map((item, index) => (
+              {(field.amenities || amenities).map((item: any, index: number) => (
                 <View
                   key={index}
                   style={styles.amenityCard}
                 >
                   <View
-                    style={styles.amenityIcon}
+                    style={[styles.amenityIcon, darkMode && { backgroundColor: "#1F2937" }]}
                   >
                     <Ionicons
-                      name={item.icon as any}
+                      name={(item.icon || "checkmark-circle-outline") as any}
                       size={24}
-                      color="#111827"
+                      color={darkMode ? "#22C55E" : "#111827"}
                     />
                   </View>
 
                   <Text
-                    style={styles.amenityText}
+                    style={[styles.amenityText, darkMode && { color: "#9CA3AF" }]}
                   >
-                    {item.label}
+                    {item.label || item}
                   </Text>
                 </View>
               ))}
             </View>
           </View>
+
+          {/* REVIEWS */}
+          <View style={styles.section}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Reviews</Text>
+              <Text style={{ color: '#6B7280' }}>{reviews.length} reviews</Text>
+            </View>
+
+            {reviews.length === 0 ? (
+              <Text style={{ color: '#6B7280', fontStyle: 'italic' }}>No reviews yet.</Text>
+            ) : (
+              reviews.map((review) => (
+                <View key={review._id} style={[styles.reviewItem, darkMode && { backgroundColor: "#1F2937", borderColor: "#374151" }]}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={[styles.reviewerName, darkMode && { color: "#fff" }]}>{review.user_id?.full_name}</Text>
+                    <View style={styles.starRow}>
+                      {[...Array(5)].map((_, i) => (
+                        <Ionicons
+                          key={i}
+                          name={i < review.rating ? "star" : "star-outline"}
+                          size={14}
+                          color="#FACC15"
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  <Text style={[styles.reviewComment, darkMode && { color: "#D1D5DB" }]}>{review.comment}</Text>
+                  <Text style={styles.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+                </View>
+              ))
+            )}
+          </View>
         </View>
       </ScrollView>
 
       {/* BOTTOM ACTION */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, darkMode && { backgroundColor: "#111827", borderTopColor: "#1F2937" }]}>
         {/* FAVORITE */}
         <TouchableOpacity
           style={[
             styles.favoriteButton,
+            darkMode && { backgroundColor: "#1F2937", borderColor: "#374151" },
             isFavorite &&
               styles.favoriteButtonActive,
           ]}
@@ -224,7 +330,7 @@ export default function FieldDetailScreen() {
             color={
               isFavorite
                 ? "#EF4444"
-                : "#374151"
+                : (darkMode ? "#9CA3AF" : "#374151")
             }
           />
         </TouchableOpacity>
@@ -417,7 +523,7 @@ const styles = StyleSheet.create({
     height: 58,
 
     borderRadius: 18,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#22C55E",
 
     justifyContent: "center",
     alignItems: "center",
@@ -427,5 +533,53 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700",
+  },
+  backIconBtn: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  reviewItem: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  reviewerName: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewComment: {
+    color: '#4B5563',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 8,
   },
 });

@@ -4,46 +4,102 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { LineChart } from "react-native-chart-kit";
 
-const bookings = [
-  { status: "approved", price: 100 },
-  { status: "approved", price: 200 },
-  { status: "pending", price: 150 },
-  { status: "cancelled", price: 80 },
-];
+import { useAuthStore } from "@/src/store/auth.store";
+import { adminService } from "@/src/services/admin.service";
+import { useEffect, useState } from "react";
+
+const screenWidth = Dimensions.get("window").width;
 
 export default function Dashboard() {
+  const { darkMode } = useAuthStore();
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
 
-  const totalRevenue = bookings
-    .filter((b) => b.status === "approved")
-    .reduce((sum, b) => sum + b.price, 0);
+  const [stats, setStats] = useState<any>({
+    total_bookings: 0,
+    total_revenue: 0,
+    total_users: 0,
+    total_fields: 0,
+    monthly_revenue: []
+  });
+  const [loading, setLoading] = useState(true);
 
-  const totalBookings = bookings.length;
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
-  const approved = bookings.filter((b) => b.status === "approved").length;
-  const pending = bookings.filter((b) => b.status === "pending").length;
-  const cancelled = bookings.filter((b) => b.status === "cancelled").length;
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const res = await adminService.getDashboard();
+      if (res.data) {
+        setStats(res.data);
+      }
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getChartData = () => {
+    if (!stats.monthly_revenue || stats.monthly_revenue.length === 0) {
+      return {
+        labels: ["T1", "T2", "T3", "T4", "T5", "T6"],
+        datasets: [{ data: [0, 0, 0, 0, 0, 0] }]
+      };
+    }
+
+    const months = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+    const data = new Array(12).fill(0);
+
+    stats.monthly_revenue.forEach((item: any) => {
+      if (item.month >= 1 && item.month <= 12) {
+        data[item.month - 1] = item.revenue / 1000000;
+      }
+    });
+
+    const currentMonth = new Date().getMonth();
+    const last6MonthsLabels = [];
+    const last6MonthsData = [];
+
+    for (let i = 5; i >= 0; i--) {
+      let m = currentMonth - i;
+      if (m < 0) m += 12;
+      last6MonthsLabels.push(months[m]);
+      last6MonthsData.push(data[m]);
+    }
+
+    return {
+      labels: last6MonthsLabels,
+      datasets: [{ data: last6MonthsData }]
+    };
+  };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
       {/* HEADER */}
-      <View style={styles.header}>
+      <View style={[styles.header, darkMode && { backgroundColor: "#065F46" }]}>
         <View>
           <Text style={styles.title}>Admin Dashboard</Text>
-          <Text style={styles.subtitle}>
-            Overview of system performance
+          <Text style={[styles.subtitle, darkMode && { color: "#A7F3D0" }]}>
+            Chào mừng, {user?.full_name || "Admin"}
           </Text>
         </View>
 
         <View style={styles.headerRight}>
-          <Ionicons name="notifications-outline" size={22} color="#fff" />
+          <TouchableOpacity onPress={fetchStats}>
+            <Ionicons name="refresh-outline" size={22} color="#fff" style={{ marginRight: 10 }} />
+          </TouchableOpacity>
           <View style={styles.avatar}>
             <Text style={{ color: "#16a34a", fontWeight: "bold" }}>
-              AD
+              {user?.full_name?.substring(0, 2).toUpperCase() || "AD"}
             </Text>
           </View>
         </View>
@@ -51,43 +107,55 @@ export default function Dashboard() {
 
       {/* KPI */}
       <View style={styles.grid}>
-        <Card title="Bookings" value={totalBookings} icon="calendar" />
-        <Card title="Revenue" value={`$${totalRevenue}`} icon="cash" />
-        <Card title="Approved" value={approved} icon="checkmark" />
-        <Card title="Pending" value={pending} icon="time" />
+        <Card title="Bookings" value={stats.total_bookings} icon="calendar" darkMode={darkMode} />
+        <Card title="Revenue" value={`${stats.total_revenue?.toLocaleString('vi-VN')}đ`} icon="cash" darkMode={darkMode} />
+        <Card title="Users" value={stats.total_users} icon="people" darkMode={darkMode} />
+        <Card title="Fields" value={stats.total_fields} icon="football" darkMode={darkMode} />
+      </View>
+
+      <Text style={[styles.section, darkMode && { color: "#fff" }]}>Hệ thống doanh thu (Triệu VNĐ)</Text>
+      <View style={[styles.chartBox, darkMode && { backgroundColor: "#1F2937" }]}>
+        <LineChart
+          data={getChartData()}
+          width={screenWidth - 40}
+          height={180}
+          chartConfig={{
+            backgroundColor: darkMode ? "#1F2937" : "#fff",
+            backgroundGradientFrom: darkMode ? "#1F2937" : "#fff",
+            backgroundGradientTo: darkMode ? "#1F2937" : "#fff",
+            decimalPlaces: 1,
+            color: (opacity = 1) => `rgba(22, 163, 74, ${opacity})`,
+            labelColor: (opacity = 1) => darkMode ? `rgba(156, 163, 175, ${opacity})` : `rgba(107, 114, 128, ${opacity})`,
+            style: { borderRadius: 16 },
+            propsForDots: { r: "3", strokeWidth: "2", stroke: "#16a34a" }
+          }}
+          bezier
+          style={{ marginVertical: 8, borderRadius: 16 }}
+        />
       </View>
 
       {/* QUICK ACTION */}
-      <Text style={styles.section}>Quick Actions</Text>
+      <Text style={[styles.section, darkMode && { color: "#fff" }]}>Quick Actions</Text>
 
       <TouchableOpacity
-        style={styles.actionCard}
+        style={[styles.actionCard, darkMode && { backgroundColor: "#1F2937" }]}
         onPress={() => router.push("/(admin)/bookings")}
       >
         <Ionicons name="list" size={20} color="#16a34a" />
-        <Text style={styles.actionText}>Manage Bookings</Text>
-        <Ionicons name="chevron-forward" size={18} />
+        <Text style={[styles.actionText, darkMode && { color: "#fff" }]}>Manage Bookings</Text>
+        <Ionicons name="chevron-forward" size={18} color={darkMode ? "#9CA3AF" : "#111827"} />
       </TouchableOpacity>
-
-      {/* STATUS SUMMARY */}
-      <Text style={styles.section}>Booking Status</Text>
-
-      <View style={styles.row}>
-        <StatusBox label="Approved" value={approved} color="#16a34a" />
-        <StatusBox label="Pending" value={pending} color="#f59e0b" />
-        <StatusBox label="Cancelled" value={cancelled} color="#6b7280" />
-      </View>
     </ScrollView>
   );
 }
 
 /* COMPONENTS */
 
-const Card = ({ title, value, icon }: any) => (
-  <View style={styles.card}>
+const Card = ({ title, value, icon, darkMode }: any) => (
+  <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
     <Ionicons name={icon} size={20} color="#16a34a" />
-    <Text style={styles.cardTitle}>{title}</Text>
-    <Text style={styles.cardValue}>{value}</Text>
+    <Text style={[styles.cardTitle, darkMode && { color: "#9CA3AF" }]}>{title}</Text>
+    <Text style={[styles.cardValue, darkMode && { color: "#fff" }]}>{value}</Text>
   </View>
 );
 
@@ -163,6 +231,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginTop: 5,
+  },
+
+  chartBox: {
+    backgroundColor: "#fff",
+    marginHorizontal: 15,
+    padding: 10,
+    borderRadius: 12,
+    alignItems: "center",
   },
 
   section: {

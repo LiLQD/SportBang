@@ -5,76 +5,76 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { bookingService } from "@/src/services/booking.service";
+import { useAuthStore } from "@/src/store/auth.store";
 
-type Status = "pending" | "approved" | "cancelled";
-
-interface Booking {
-  id: string;
-  user: string;
-  field: string;
-  date: string;
-  time: string;
-  status: Status;
-}
-
-const mockData: Booking[] = [
-  {
-    id: "1",
-    user: "Nguyen Van A",
-    field: "Sân A",
-    date: "2026-05-05",
-    time: "14:00 - 16:00",
-    status: "pending",
-  },
-  {
-    id: "2",
-    user: "Tran Van B",
-    field: "Sân B",
-    date: "2026-05-06",
-    time: "10:00 - 12:00",
-    status: "approved",
-  },
-];
+type Status = "pending" | "approved" | "confirmed" | "cancelled" | "completed";
 
 export default function AdminBookings() {
-  const [bookings, setBookings] = useState(mockData);
-  const [status, setStatus] = useState<Status | "all">("all");
+  const { darkMode } = useAuthStore();
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [date, setDate] = useState("");
 
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const data = await bookingService.getAllBookings();
+      setBookings(data);
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filtered = bookings.filter((b) => {
-    const matchStatus = status === "all" || b.status === status;
-    const matchDate = !date || b.date === date;
+    const matchStatus = statusFilter === "all" || b.status === statusFilter;
+    const bookingDate = new Date(b.booking_date).toISOString().split('T')[0];
+    const matchDate = !date || bookingDate === date;
     return matchStatus && matchDate;
   });
 
-  const updateStatus = (id: string, newStatus: Status) => {
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, status: newStatus } : b
-      )
-    );
+  const updateStatus = async (id: string, newStatus: string) => {
+    try {
+      await bookingService.updateBookingStatus(id, newStatus);
+      fetchBookings();
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.message || "Cập nhật trạng thái thất bại");
+    }
   };
 
-  const getColor = (s: Status) => {
+  const getColor = (s: string) => {
     switch (s) {
       case "pending":
         return "#f59e0b";
       case "approved":
+      case "confirmed":
+      case "completed":
         return "#16a34a";
       case "cancelled":
+        return "#6b7280";
+      default:
         return "#6b7280";
     }
   };
 
-  const renderItem = ({ item }: { item: Booking }) => (
-    <View style={styles.row}>
-      <Text style={styles.cell}>{item.user}</Text>
-      <Text style={styles.cell}>{item.field}</Text>
-      <Text style={styles.cell}>{item.date}</Text>
-      <Text style={styles.cell}>{item.time}</Text>
+  const renderItem = ({ item }: { item: any }) => (
+    <View style={[styles.row, darkMode && { backgroundColor: "#1F2937" }]}>
+      <Text style={[styles.cell, darkMode && { color: "#fff" }]} numberOfLines={1}>{item.user_id?.full_name || "Unknown"}</Text>
+      <Text style={[styles.cell, darkMode && { color: "#fff" }]} numberOfLines={1}>{item.field_id?.field_name || "N/A"}</Text>
+      <Text style={[styles.cell, darkMode && { color: "#fff" }]}>{new Date(item.booking_date).toLocaleDateString()}</Text>
+      <Text style={[styles.cell, darkMode && { color: "#fff" }]}>{item.booking_slot?.start}-{item.booking_slot?.end}</Text>
 
       {/* STATUS */}
       <View
@@ -91,15 +91,15 @@ export default function AdminBookings() {
         {item.status === "pending" && (
           <>
             <TouchableOpacity
-              onPress={() => updateStatus(item.id, "approved")}
+              onPress={() => updateStatus(item._id, "confirmed")}
             >
-              <Ionicons name="checkmark" size={18} color="green" />
+              <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => updateStatus(item.id, "cancelled")}
+              onPress={() => updateStatus(item._id, "cancelled")}
             >
-              <Ionicons name="close" size={18} color="red" />
+              <Ionicons name="close-circle" size={24} color="#ef4444" />
             </TouchableOpacity>
           </>
         )}
@@ -107,37 +107,47 @@ export default function AdminBookings() {
     </View>
   );
 
+  if (loading && bookings.length === 0) {
+    return (
+      <View style={[styles.centered, darkMode && { backgroundColor: "#111827" }]}>
+        <ActivityIndicator size="large" color="#16a34a" />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Booking Management</Text>
+    <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
+      <Text style={[styles.title, darkMode && { color: "#fff" }]}>Booking Management</Text>
 
       {/* FILTER */}
-      <View style={styles.filter}>
-        <View style={styles.inputBox}>
-          <Ionicons name="calendar-outline" size={16} />
+      <View style={[styles.filter, darkMode && { backgroundColor: "#1F2937" }]}>
+        <View style={[styles.inputBox, darkMode && { borderColor: "#374151" }]}>
+          <Ionicons name="calendar-outline" size={16} color={darkMode ? "#9CA3AF" : "#111827"} />
           <TextInput
             placeholder="YYYY-MM-DD"
+            placeholderTextColor={darkMode ? "#4B5563" : "#9CA3AF"}
             value={date}
             onChangeText={setDate}
-            style={{ flex: 1 }}
+            style={[{ flex: 1 }, darkMode && { color: "#fff" }]}
           />
         </View>
 
         <View style={styles.statusRow}>
-          {["all", "pending", "approved", "cancelled"].map((s) => (
+          {["all", "pending", "confirmed", "cancelled", "completed"].map((s) => (
             <TouchableOpacity
               key={s}
-              onPress={() => setStatus(s as any)}
+              onPress={() => setStatusFilter(s as any)}
               style={[
                 styles.statusBtn,
-                status === s && styles.active,
+                darkMode && { borderColor: "#374151" },
+                statusFilter === s && styles.active,
               ]}
             >
               <Text
                 style={
-                  status === s
+                  statusFilter === s
                     ? styles.activeText
-                    : styles.text
+                    : [styles.text, darkMode && { color: "#9CA3AF" }]
                 }
               >
                 {s}
@@ -148,20 +158,23 @@ export default function AdminBookings() {
       </View>
 
       {/* HEADER TABLE */}
-      <View style={styles.header}>
-        <Text style={styles.cell}>User</Text>
-        <Text style={styles.cell}>Field</Text>
-        <Text style={styles.cell}>Date</Text>
-        <Text style={styles.cell}>Time</Text>
-        <Text style={styles.cell}>Status</Text>
-        <Text style={styles.cell}>Action</Text>
+      <View style={[styles.header, darkMode && { backgroundColor: "#1F2937" }]}>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>User</Text>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Field</Text>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Date</Text>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Time</Text>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Status</Text>
+        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Action</Text>
       </View>
 
       {/* LIST */}
       <FlatList
         data={filtered}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         renderItem={renderItem}
+        refreshing={loading}
+        onRefresh={fetchBookings}
+        ListEmptyComponent={<Text style={[{ textAlign: 'center', marginTop: 20 }, darkMode && { color: "#9CA3AF" }]}>No bookings found</Text>}
       />
     </View>
   );

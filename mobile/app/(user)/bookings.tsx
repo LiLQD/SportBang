@@ -5,266 +5,156 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  TextInput,
+  Platform,
 } from "react-native";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
-
-interface Booking {
-  id: string;
-  fieldName: string;
-  date: string;
-  time: string;
-  imageUrl: string;
-}
-
-const mockBookings: Booking[] = [
-  {
-    id: "1",
-    fieldName: "Downtown Soccer Field A",
-    date: "2026-05-10",
-    time: "14:00 - 16:00",
-    imageUrl:
-      "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=400&h=250&fit=crop",
-  },
-
-  {
-    id: "2",
-    fieldName: "Riverside Basketball Court",
-    date: "2026-05-12",
-    time: "18:00 - 20:00",
-    imageUrl:
-      "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=250&fit=crop",
-  },
-
-  {
-    id: "3",
-    fieldName: "Central Tennis Court 3",
-    date: "2026-05-15",
-    time: "10:00 - 12:00",
-    imageUrl:
-      "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=250&fit=crop",
-  },
-
-  {
-    id: "4",
-    fieldName: "Northside Volleyball Court",
-    date: "2026-05-18",
-    time: "16:00 - 18:00",
-    imageUrl:
-      "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=400&h=250&fit=crop",
-  },
-];
+import { bookingService } from "@/src/services/booking.service";
+import { reviewService } from "@/src/services/review.service";
+import { getShadow } from "@/src/utils/style";
+import { useAuthStore } from "@/src/store/auth.store";
 
 export default function BookingScreen() {
-  const [bookings, setBookings] =
-    useState<Booking[]>(mockBookings);
+  const { darkMode } = useAuthStore();
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCancelBooking = (id: string) => {
-    setBookings((prev) =>
-      prev.filter((booking) => booking.id !== id)
-    );
+  useEffect(() => { fetchBookings(); }, []);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const res = await bookingService.getMyBookings();
+      if (res && res.data) {
+        setBookings(res.data);
+      } else {
+        setBookings([]);
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      setBookings([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const renderBooking = ({
-    item,
-  }: {
-    item: Booking;
-  }) => {
-    return (
-      <View style={styles.card}>
+  const handleCancelBooking = async (id: string) => {
+    Alert.alert("Xác nhận", "Bạn có chắc muốn hủy?", [
+      { text: "Không", style: "cancel" },
+      { text: "Có", onPress: async () => {
+          try {
+            await bookingService.cancelBooking(id);
+            fetchBookings();
+          } catch (error: any) {
+            Alert.alert("Lỗi", error.message);
+          }
+      }}
+    ]);
+  };
 
-        {/* IMAGE */}
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.image}
-        />
+  const submitReview = async () => {
+    if (!selectedBooking) return;
+    try {
+      setIsSubmitting(true);
+      await reviewService.createReview({
+        field_id: selectedBooking.field_id._id,
+        booking_id: selectedBooking._id,
+        rating,
+        comment,
+      });
+      setIsReviewModalVisible(false);
+      fetchBookings();
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-        {/* CONTENT */}
-        <View style={styles.contentContainer}>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.fieldName}>
-              {item.fieldName}
-            </Text>
-
-            {/* DATE */}
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color="#6B7280"
-              />
-
-              <Text style={styles.infoText}>
-                {new Date(item.date).toDateString()}
-              </Text>
-            </View>
-
-            {/* TIME */}
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="time-outline"
-                size={18}
-                color="#6B7280"
-              />
-
-              <Text style={styles.infoText}>
-                {item.time}
-              </Text>
-            </View>
-
-            {/* STATUS */}
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                Upcoming
-              </Text>
-            </View>
+  const renderBooking = ({ item }: { item: any }) => (
+    <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
+      <Image source={{ uri: item.field_id?.images?.[0] }} style={styles.image} />
+      <View style={styles.contentContainer}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.field_id?.field_name || "Sân bóng"}</Text>
+          <Text style={[styles.infoText, darkMode && { color: "#9CA3AF" }]}>{new Date(item.booking_date).toLocaleDateString()}</Text>
+          <Text style={[styles.infoText, darkMode && { color: "#9CA3AF" }]}>{item.booking_slot.start} - {item.booking_slot.end}</Text>
+          <View style={[styles.badge, item.status === 'cancelled' && { backgroundColor: '#FEE2E2' }, darkMode && item.status !== 'cancelled' && { backgroundColor: '#1E3A8A' }]}>
+            <Text style={[styles.badgeText, item.status === 'cancelled' && { color: '#EF4444' }, darkMode && item.status !== 'cancelled' && { color: '#60A5FA' }]}>{item.status.toUpperCase()}</Text>
           </View>
-
-          {/* BUTTON */}
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() =>
-              handleCancelBooking(item.id)
-            }
-          >
-            <Text style={styles.cancelText}>
-              Cancel Booking
-            </Text>
-          </TouchableOpacity>
+        </View>
+        <View style={{ gap: 8 }}>
+          {(item.status === 'pending' || item.status === 'confirmed') && (
+            <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelBooking(item._id)}>
+              <Text style={styles.cancelText}>Hủy</Text>
+            </TouchableOpacity>
+          )}
+          {item.status === 'completed' && (
+            <TouchableOpacity style={styles.reviewButton} onPress={() => { setSelectedBooking(item); setIsReviewModalVisible(true); }}>
+              <Text style={styles.reviewButtonText}>Đánh giá</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-    );
-  };
+    </View>
+  );
+
+  if (loading) return <View style={[styles.centered, darkMode && { backgroundColor: "#111827" }]}><ActivityIndicator size="large" color="#22C55E" /></View>;
 
   return (
-    <View style={styles.container}>
-
-      <Text style={styles.title}>
-        Upcoming Bookings
-      </Text>
-
+    <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
+      <Text style={[styles.title, darkMode && { color: "#fff" }]}>Lịch sử đặt sân</Text>
       <FlatList
         data={bookings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         renderItem={renderBooking}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: 20,
-        }}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              No upcoming bookings
-            </Text>
-          </View>
-        }
+        ListEmptyComponent={<Text style={styles.emptyText}>Chưa có lịch đặt nào</Text>}
       />
+      <Modal visible={isReviewModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, darkMode && { backgroundColor: "#1F2937" }]}>
+            <Text style={[styles.modalTitle, darkMode && { color: "#fff" }]}>Đánh giá sân</Text>
+            <TextInput style={[styles.reviewInput, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]} multiline value={comment} onChangeText={setComment} placeholder="Cảm nhận của bạn..." placeholderTextColor="#9CA3AF" />
+            <TouchableOpacity style={styles.submitBtn} onPress={submitReview} disabled={isSubmitting}>
+              {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={{color:'#fff', fontWeight: 'bold'}}>Gửi</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsReviewModalVisible(false)}><Text style={{marginTop:10, color:'#9CA3AF'}}>Đóng</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    padding: 16,
-  },
-
-  title: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 24,
-  },
-
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 18,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
-  },
-
-  image: {
-    width: "100%",
-    height: 190,
-  },
-
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    gap: 14,
-  },
-
-  fieldName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 14,
-  },
-
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-
-  infoText: {
-    color: "#6B7280",
-    fontSize: 14,
-  },
-
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#DBEAFE",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginTop: 8,
-  },
-
-  badgeText: {
-    color: "#2563EB",
-    fontWeight: "600",
-  },
-
-  cancelButton: {
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignSelf: "flex-start",
-  },
-
-  cancelText: {
-    color: "#DC2626",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-
-  emptyBox: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 40,
-    alignItems: "center",
-  },
-
-  emptyText: {
-    color: "#9CA3AF",
-    fontSize: 16,
-  },
+  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  title: { fontSize: 24, fontWeight: "700", marginBottom: 20 },
+  card: { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden", marginBottom: 18, ...getShadow(0.05, 10, 3) },
+  image: { width: "100%", height: 150 },
+  contentContainer: { flexDirection: "row", padding: 16 },
+  fieldName: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
+  infoText: { color: "#6B7280", marginBottom: 4 },
+  badge: { alignSelf: 'flex-start', padding: 6, borderRadius: 8, backgroundColor: '#DBEAFE' },
+  badgeText: { fontSize: 12, fontWeight: '600', color: '#2563EB' },
+  cancelButton: { borderWidth: 1, borderColor: '#EF4444', padding: 8, borderRadius: 8 },
+  cancelText: { color: '#EF4444' },
+  reviewButton: { backgroundColor: '#22C55E', padding: 8, borderRadius: 8 },
+  reviewButtonText: { color: '#fff' },
+  emptyText: { textAlign: 'center', marginTop: 50, color: '#9CA3AF' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 15 },
+  reviewInput: { width: '100%', height: 100, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 10, marginBottom: 15 },
+  submitBtn: { backgroundColor: '#22C55E', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' }
 });

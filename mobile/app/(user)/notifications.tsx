@@ -4,515 +4,76 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ScrollView,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
-
-type NotificationType =
-  | "all"
-  | "booking"
-  | "payment"
-  | "promotion"
-  | "system";
-
-interface Notification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  time: string;
-  isUnread: boolean;
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "booking",
-    title: "Booking Confirmed",
-    message:
-      "Your booking at Downtown Stadium has been confirmed.",
-    time: "2m ago",
-    isUnread: true,
-  },
-
-  {
-    id: "2",
-    type: "booking",
-    title: "Match Reminder",
-    message:
-      "You have a football match today at 7:00 PM.",
-    time: "1h ago",
-    isUnread: true,
-  },
-
-  {
-    id: "3",
-    type: "payment",
-    title: "Payment Successful",
-    message:
-      "Your payment of $25 was completed successfully.",
-    time: "3h ago",
-    isUnread: false,
-  },
-
-  {
-    id: "4",
-    type: "promotion",
-    title: "Weekend Special",
-    message:
-      "Get 20% off for weekend bookings.",
-    time: "Yesterday",
-    isUnread: false,
-  },
-
-  {
-    id: "5",
-    type: "system",
-    title: "System Update",
-    message:
-      "New version available with improved booking experience.",
-    time: "2 days ago",
-    isUnread: false,
-  },
-];
-
-const categories: {
-  label: string;
-  value: NotificationType;
-}[] = [
-  { label: "All", value: "all" },
-  { label: "Booking", value: "booking" },
-  { label: "Payment", value: "payment" },
-  { label: "Promotion", value: "promotion" },
-  { label: "System", value: "system" },
-];
+import { notificationService } from "@/src/services/notification.service";
+import { getShadow } from "@/src/utils/style";
 
 export default function NotificationScreen() {
-  const [selectedCategory, setSelectedCategory] =
-    useState<NotificationType>("all");
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [notifications, setNotifications] =
-    useState(mockNotifications);
+  useEffect(() => { fetchNotifications(); }, []);
 
-  const filteredNotifications =
-    selectedCategory === "all"
-      ? notifications
-      : notifications.filter(
-          (n) => n.type === selectedCategory
-        );
-
-  const unreadCount = notifications.filter(
-    (n) => n.isUnread
-  ).length;
-
-  const markAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((n) => ({
-        ...n,
-        isUnread: false,
-      }))
-    );
-  };
-
-  const handleNotificationClick = (
-    id: string
-  ) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, isUnread: false }
-          : n
-      )
-    );
-  };
-
-  const getNotificationIcon = (
-    type: NotificationType
-  ) => {
-    switch (type) {
-      case "booking":
-        return "calendar-outline";
-
-      case "payment":
-        return "wallet-outline";
-
-      case "promotion":
-        return "gift-outline";
-
-      case "system":
-        return "settings-outline";
-
-      default:
-        return "notifications-outline";
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const res = await notificationService.getNotifications();
+      // Backend trả về { success: true, message: ..., data: [...] }
+      if (res && res.data) {
+        setNotifications(res.data);
+      } else {
+        setNotifications([]);
+      }
+    } catch (error) {
+      console.error("[Notification] Error:", error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getIconColor = (
-    type: NotificationType
-  ) => {
-    switch (type) {
-      case "booking":
-        return "#22C55E";
+  const renderNotification = ({ item }: { item: any }) => (
+    <View style={[styles.card, !item.is_read && styles.unread]}>
+      <View style={styles.iconContainer}>
+        <Ionicons name="notifications-outline" size={24} color="#22C55E" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+        <Text style={styles.message}>{item.message}</Text>
+        <Text style={styles.time}>{new Date(item.createdAt).toLocaleTimeString()}</Text>
+      </View>
+    </View>
+  );
 
-      case "payment":
-        return "#3B82F6";
-
-      case "promotion":
-        return "#F97316";
-
-      case "system":
-        return "#6B7280";
-
-      default:
-        return "#6B7280";
-    }
-  };
-
-  const renderNotification = ({
-    item,
-  }: {
-    item: Notification;
-  }) => {
-    return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() =>
-          handleNotificationClick(item.id)
-        }
-        style={[
-          styles.notificationCard,
-
-          item.isUnread &&
-            styles.unreadCard,
-        ]}
-      >
-        {/* ICON */}
-        <View
-          style={[
-            styles.iconContainer,
-            {
-              backgroundColor:
-                item.type === "booking"
-                  ? "#DCFCE7"
-                  : item.type === "payment"
-                  ? "#DBEAFE"
-                  : item.type === "promotion"
-                  ? "#FFEDD5"
-                  : "#F3F4F6",
-            },
-          ]}
-        >
-          <Ionicons
-            name={
-              getNotificationIcon(item.type) as any
-            }
-            size={24}
-            color={getIconColor(item.type)}
-          />
-        </View>
-
-        {/* CONTENT */}
-        <View style={styles.content}>
-          <View style={styles.topRow}>
-            <Text style={styles.title}>
-              {item.title}
-            </Text>
-
-            {item.isUnread && (
-              <View style={styles.newBadge}>
-                <Text style={styles.newText}>
-                  NEW
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.message}>
-            {item.message}
-          </Text>
-
-          <Text style={styles.time}>
-            {item.time}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#22C55E" /></View>;
 
   return (
     <View style={styles.container}>
-
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.screenTitle}>
-            Notifications
-          </Text>
-
-          <Text style={styles.subtitle}>
-            Stay updated with your bookings
-          </Text>
-        </View>
-
-        {unreadCount > 0 && (
-          <TouchableOpacity
-            style={styles.readAllButton}
-            onPress={markAllAsRead}
-          >
-            <Ionicons
-              name="checkmark-done-outline"
-              size={18}
-              color="#fff"
-            />
-
-            <Text style={styles.readAllText}>
-              Read all
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* CATEGORIES */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={
-          styles.categoryContainer
-        }
-      >
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category.value}
-            style={[
-              styles.categoryButton,
-
-              selectedCategory ===
-                category.value &&
-                styles.activeCategoryButton,
-            ]}
-            onPress={() =>
-              setSelectedCategory(
-                category.value
-              )
-            }
-          >
-            <Text
-              style={[
-                styles.categoryText,
-
-                selectedCategory ===
-                  category.value &&
-                  styles.activeCategoryText,
-              ]}
-            >
-              {category.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* LIST */}
+      <Text style={styles.screenTitle}>Thông báo</Text>
       <FlatList
-        data={filteredNotifications}
-        keyExtractor={(item) => item.id}
+        data={notifications}
+        keyExtractor={(item) => item._id}
         renderItem={renderNotification}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: 30,
-        }}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons
-              name="notifications-outline"
-              size={70}
-              color="#D1D5DB"
-            />
-
-            <Text style={styles.emptyTitle}>
-              No notifications yet
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Booking and payment updates
-              will appear here
-            </Text>
-          </View>
-        }
+        ListEmptyComponent={<Text style={styles.empty}>Không có thông báo mới</Text>}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FB",
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-
-  screenTitle: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: "#111827",
-  },
-
-  subtitle: {
-    color: "#6B7280",
-    marginTop: 4,
-  },
-
-  readAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-
-  readAllText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-
-  categoryContainer: {
-    gap: 10,
-    paddingBottom: 20,
-  },
-
-  categoryButton: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-
-    borderRadius: 999,
-
-    backgroundColor: "#F3F4F6",
-
-    marginRight: 10,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    minHeight: 42,
-  },
-
-  activeCategoryButton: {
-    backgroundColor: "#22C55E",
-  },
-
-  categoryText: {
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-
-  activeCategoryText: {
-    color: "#FFFFFF",
-  },
-
-  notificationCard: {
-    flexDirection: "row",
-    gap: 14,
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 14,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 2,
-  },
-
-  unreadCard: {
-    backgroundColor: "#F0FDF4",
-  },
-
-  iconContainer: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  content: {
-    flex: 1,
-  },
-
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-    flex: 1,
-    marginRight: 10,
-  },
-
-  newBadge: {
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-
-  newText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
-  },
-
-  message: {
-    color: "#6B7280",
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-
-  time: {
-    color: "#9CA3AF",
-    fontSize: 12,
-  },
-
-  emptyBox: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 120,
-    paddingHorizontal: 30,
-  },
-
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: 20,
-    color: "#111827",
-  },
-
-  emptyText: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 10,
-    lineHeight: 22,
-  },
+  container: { flex: 1, backgroundColor: "#F8F9FB", padding: 16 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  screenTitle: { fontSize: 24, fontWeight: "700", marginBottom: 20 },
+  card: { flexDirection: 'row', padding: 16, backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, ...getShadow(0.04, 10, 2) },
+  unread: { backgroundColor: '#F0FDF4' },
+  iconContainer: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#DCFCE7', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  cardTitle: { fontWeight: '700', fontSize: 16, marginBottom: 4 },
+  message: { color: '#6B7280', fontSize: 14, marginBottom: 4 },
+  time: { color: '#9CA3AF', fontSize: 12 },
+  empty: { textAlign: 'center', marginTop: 100, color: '#9CA3AF' }
 });

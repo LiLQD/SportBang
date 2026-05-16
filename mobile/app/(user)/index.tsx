@@ -6,10 +6,16 @@ import {
   TextInput,
   Image,
   ScrollView,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { fieldService } from "@/src/services/field.service";
+import { useAuthStore } from "@/src/store/auth.store";
+import { getShadow } from "@/src/utils/style";
 
 const categories = [
   "Football",
@@ -18,77 +24,67 @@ const categories = [
   "Basketball",
 ];
 
-const featuredFields = [
-  {
-    id: "1",
-    name: "Premier Stadium",
-    image:
-      "https://images.unsplash.com/photo-1600130202712-fd01014ffa79",
-    rating: 4.8,
-    price: 50,
-  },
-
-  {
-    id: "2",
-    name: "Elite Badminton Court",
-    image:
-      "https://images.unsplash.com/photo-1776999035766-9c2b5cddf613",
-    rating: 4.9,
-    price: 30,
-  },
-];
-
-const nearbyFields = [
-  {
-    id: "3",
-    name: "City Sports Arena",
-    image:
-      "https://images.unsplash.com/photo-1705593813682-033ee2991df6",
-    rating: 4.6,
-    price: 45,
-    distance: "1.2 km",
-  },
-
-  {
-    id: "4",
-    name: "Green Field Stadium",
-    image:
-      "https://images.unsplash.com/photo-1729843352938-0e10fbf96585",
-    rating: 4.5,
-    price: 35,
-    distance: "2.5 km",
-  },
-];
-
 export default function HomeScreen() {
+  const { user, darkMode } = useAuthStore();
+  const [fields, setFields] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Chỉ fetch khi đã có user để đảm bảo token trong apiCall đã sẵn sàng
+    if (user) {
+      fetchFields();
+    }
+  }, [user]);
+
+  const fetchFields = async () => {
+    try {
+      setLoading(true);
+      const res = await fieldService.getAllFields();
+      // Backend trả về { success: true, message: ..., data: [...] }
+      if (res && res.data) {
+        setFields(res.data);
+      } else {
+        setFields([]);
+      }
+    } catch (error) {
+      console.error("Error fetching fields:", error);
+      setFields([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* HEADER */}
-        <View style={styles.header}>
+        <View style={[styles.header, darkMode && { backgroundColor: "#065F46" }]}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.helloText}>
+              <Text style={[styles.helloText, darkMode && { color: "#A7F3D0" }]}>
                 Hello,
               </Text>
 
               <Text style={styles.userName}>
-                User
+                {user?.full_name || "User"}
               </Text>
             </View>
 
-            <View style={styles.avatar}>
+            <TouchableOpacity
+              style={[styles.avatar, darkMode && { backgroundColor: "#1F2937" }]}
+              onPress={() => router.push("/(user)/profile")}
+            >
               <Ionicons
                 name="person"
                 size={28}
                 color="#22C55E"
               />
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* SEARCH */}
-          <View style={styles.searchBox}>
+          <View style={[styles.searchBox, darkMode && { backgroundColor: "#1F2937" }]}>
             <Ionicons
               name="search"
               size={20}
@@ -98,7 +94,7 @@ export default function HomeScreen() {
             <TextInput
               placeholder="Find sports fields..."
               placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              style={[styles.input, darkMode && { color: "#fff" }]}
             />
           </View>
         </View>
@@ -112,9 +108,9 @@ export default function HomeScreen() {
           {categories.map((category) => (
             <TouchableOpacity
               key={category}
-              style={styles.categoryButton}
+              style={[styles.categoryButton, darkMode && { backgroundColor: "#1F2937" }]}
             >
-              <Text style={styles.categoryText}>
+              <Text style={[styles.categoryText, darkMode && { color: "#fff" }]}>
                 {category}
               </Text>
             </TouchableOpacity>
@@ -123,31 +119,89 @@ export default function HomeScreen() {
 
         {/* FEATURED */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
             Featured Fields
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {featuredFields.map((field) => (
+          {loading ? (
+            <ActivityIndicator size="large" color="#22C55E" />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {fields.slice(0, 3).map((field) => (
+                <TouchableOpacity
+                  key={field?._id}
+                  style={[styles.featuredCard, darkMode && { backgroundColor: "#1F2937" }]}
+                  onPress={() =>
+                    router.push(`/field/${field?._id}`)
+                  }
+                >
+                  <Image
+                    source={{ uri: field?.images?.[0] || "https://images.unsplash.com/photo-1600130202712-fd01014ffa79" }}
+                    style={styles.featuredImage}
+                  />
+
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.fieldName, darkMode && { color: "#fff" }]} numberOfLines={1}>
+                      {field?.field_name}
+                    </Text>
+
+                    <View style={styles.rowBetween}>
+                      <View style={styles.row}>
+                        <Ionicons
+                          name="star"
+                          size={16}
+                          color="#FACC15"
+                        />
+
+                        <Text style={darkMode && { color: "#9CA3AF" }}>{field?.users_rate || 5.0}</Text>
+                      </View>
+
+                      <Text style={styles.price}>
+                        {field?.price_per_hour?.toLocaleString('vi-VN')}đ/h
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* NEARBY (All Fields) */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
+            All Fields
+          </Text>
+
+          {loading ? (
+            <ActivityIndicator size="large" color="#22C55E" />
+          ) : (
+            fields.map((field) => (
               <TouchableOpacity
-                key={field.id}
-                style={styles.featuredCard}
+                key={field?._id}
+                style={[styles.nearbyCard, darkMode && { backgroundColor: "#1F2937" }]}
                 onPress={() =>
-                  router.push(`/field/${field.id}`)
+                  router.push(`/field/${field?._id}`)
                 }
               >
                 <Image
-                  source={{ uri: field.image }}
-                  style={styles.featuredImage}
+                  source={{ uri: field?.images?.[0] || "https://images.unsplash.com/photo-1705593813682-033ee2991df6" }}
+                  style={styles.nearbyImage}
                 />
 
-                <View style={styles.cardContent}>
-                  <Text style={styles.fieldName}>
-                    {field.name}
-                  </Text>
+                <View style={styles.nearbyContent}>
+                  <View>
+                    <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>
+                      {field?.field_name}
+                    </Text>
+
+                    <Text style={[styles.distance, darkMode && { color: "#9CA3AF" }]} numberOfLines={1}>
+                      {field?.address || "Location unavailable"}
+                    </Text>
+                  </View>
 
                   <View style={styles.rowBetween}>
                     <View style={styles.row}>
@@ -157,67 +211,17 @@ export default function HomeScreen() {
                         color="#FACC15"
                       />
 
-                      <Text>{field.rating}</Text>
+                      <Text style={darkMode && { color: "#9CA3AF" }}>{field?.users_rate || 5.0}</Text>
                     </View>
 
                     <Text style={styles.price}>
-                      ${field.price}/h
+                      {field?.price_per_hour?.toLocaleString('vi-VN')}đ/h
                     </Text>
                   </View>
                 </View>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* NEARBY */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Nearby Fields
-          </Text>
-
-          {nearbyFields.map((field) => (
-            <TouchableOpacity
-              key={field.id}
-              style={styles.nearbyCard}
-              onPress={() =>
-                router.push(`/field/${field.id}`)
-              }
-            >
-              <Image
-                source={{ uri: field.image }}
-                style={styles.nearbyImage}
-              />
-
-              <View style={styles.nearbyContent}>
-                <View>
-                  <Text style={styles.fieldName}>
-                    {field.name}
-                  </Text>
-
-                  <Text style={styles.distance}>
-                    {field.distance}
-                  </Text>
-                </View>
-
-                <View style={styles.rowBetween}>
-                  <View style={styles.row}>
-                    <Ionicons
-                      name="star"
-                      size={16}
-                      color="#FACC15"
-                    />
-
-                    <Text>{field.rating}</Text>
-                  </View>
-
-                  <Text style={styles.price}>
-                    ${field.price}/h
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+            ))
+          )}
         </View>
 
       </ScrollView>
@@ -294,11 +298,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     marginRight: 12,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...getShadow(0.05, 6, 2),
   },
 
   categoryText: {
@@ -324,11 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     marginRight: 16,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    ...getShadow(0.08, 10, 3),
   },
 
   featuredImage: {
@@ -371,11 +367,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     flexDirection: "row",
     marginBottom: 16,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...getShadow(0.05, 8, 2),
   },
 
   nearbyImage: {

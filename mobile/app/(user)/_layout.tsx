@@ -1,7 +1,10 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuthStore } from "@/src/store/auth.store";
 
 export default function UserLayout() {
+  const { darkMode } = useAuthStore();
+
   return (
     <Tabs
       screenOptions={{
@@ -14,7 +17,8 @@ export default function UserLayout() {
           height: 70,
           paddingBottom: 8,
           paddingTop: 8,
-          backgroundColor: "#fff",
+          backgroundColor: darkMode ? "#1F2937" : "#fff",
+          borderTopColor: darkMode ? "#374151" : "#E5E7EB",
         },
       }}
     >
@@ -80,6 +84,14 @@ export default function UserLayout() {
               color={color}
             />
           ),
+        }}
+      />
+
+      {/* HIDE THESE FROM TABS */}
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          href: null,
         }}
       />
 
