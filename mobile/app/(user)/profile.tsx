@@ -9,17 +9,17 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 
 import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/store/auth.store";
-import { useRouter, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { authService } from "@/src/services/auth.service";
 
 export default function ProfileScreen() {
   const { user, logout, setAuth, token, darkMode, toggleDarkMode } = useAuthStore();
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [realStats, setRealStats] = useState({ bookings: 0, favorites: 0, spent: 0 });
 
@@ -35,18 +35,29 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPass, setIsChangingPass] = useState(false);
 
-  const handleLogout = () => {
-    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
-      { text: "Hủy", style: "cancel" },
-      {
-        text: "Đăng xuất",
-        style: "destructive",
-        onPress: () => {
-          logout();
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
+  const handleLogout = async () => {
+    const performLogout = async () => {
+      try {
+        setLoading(true);
+        await logout();
+        router.replace("/(auth)/login");
+      } catch (err) {
+        console.error("Logout error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+        await performLogout();
+      }
+    } else {
+      Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+        { text: "Hủy", style: "cancel" },
+        { text: "Đăng xuất", style: "destructive", onPress: performLogout },
+      ]);
+    }
   };
 
   useFocusEffect(

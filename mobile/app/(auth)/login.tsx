@@ -39,23 +39,22 @@ export default function LoginScreen() {
       const payload = res.data || res;
       const userData = payload.user;
       const tokenData = payload.token;
+      const refreshTokenData = payload.refreshToken;
 
       if (!userData || !tokenData) {
         console.error("Dữ liệu trả về không đúng cấu trúc:", res);
         throw new Error("Không tìm thấy thông tin User hoặc Token từ Server.");
       }
 
-      // Lưu vào Store
-      setAuth(userData, tokenData);
+      // Lưu vào Store (Gồm cả Refresh Token)
+      setAuth(userData, tokenData, refreshTokenData);
 
       // Hàm điều hướng dựa trên role
       const redirectByRole = () => {
-        const role = userData.role;
-        if (role === 'admin') {
-          router.replace("/(admin)/dashboard");
-        } else {
-          router.replace("/(user)/");
-        }
+        const role = userData.role || 'customer';
+        if (role === 'admin') router.replace("/(admin)/dashboard");
+        else if (role === 'owner') router.replace("/owner");
+        else router.replace("/(user)/");
       };
 
       if (Platform.OS === 'web') {

@@ -5,9 +5,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { LineChart } from "react-native-chart-kit";
 
 import { useAuthStore } from "@/src/store/auth.store";
@@ -17,9 +19,30 @@ import { useEffect, useState } from "react";
 const screenWidth = Dimensions.get("window").width;
 
 export default function Dashboard() {
-  const { darkMode } = useAuthStore();
-  const router = useRouter();
+  const { darkMode, logout } = useAuthStore();
   const user = useAuthStore((s) => s.user);
+
+  const handleLogout = async () => {
+    const performLogout = async () => {
+      try {
+        await logout();
+        router.replace("/(auth)/login");
+      } catch (err) {
+        console.error("Logout error:", err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+        await performLogout();
+      }
+    } else {
+      Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+        { text: "Hủy", style: "cancel" },
+        { text: "Đăng xuất", style: "destructive", onPress: performLogout },
+      ]);
+    }
+  };
 
   const [stats, setStats] = useState<any>({
     total_bookings: 0,
@@ -96,6 +119,9 @@ export default function Dashboard() {
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={fetchStats}>
             <Ionicons name="refresh-outline" size={22} color="#fff" style={{ marginRight: 10 }} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={{ marginRight: 10 }}>
+            <Ionicons name="log-out-outline" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={styles.avatar}>
             <Text style={{ color: "#16a34a", fontWeight: "bold" }}>

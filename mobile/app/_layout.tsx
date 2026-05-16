@@ -2,8 +2,8 @@ import { Stack } from "expo-router";
 import { Provider as PaperProvider } from "react-native-paper";
 import { useAuthStore } from "@/src/store/auth.store";
 import { useEffect, useState } from "react";
-import { useRouter, useSegments, useRootNavigationState } from "expo-router";
-import { View, ActivityIndicator, StyleSheet, Text, Platform } from "react-native";
+import { useRouter, useSegments } from "expo-router";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
 
 export default function RootLayout() {
   const isHydrated = useAuthStore((s) => s.isHydrated);
@@ -12,50 +12,40 @@ export default function RootLayout() {
 
   const segments = useSegments();
   const router = useRouter();
-  const rootNavigationState = useRootNavigationState();
-
   const [isMounted, setIsMounted] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
-  // Bước 1: Đánh dấu đã Mount để tránh lỗi Hydration của React 19
   useEffect(() => {
     setIsMounted(true);
-    console.log("[RootLayout] App Mounted");
   }, []);
 
-  // Bước 2: Kiểm tra sẵn sàng (Hydration + Navigation)
+  // Logic điều hướng tập trung
   useEffect(() => {
-    if (!isMounted || !isHydrated) return;
+    if (!isHydrated || !isMounted) return;
 
-    // Trên Web, đôi khi navigationState.key bị null, ta bỏ qua check này để vào app luôn
-    const isNavReady = Platform.OS === 'web' ? true : !!rootNavigationState?.key;
-
-    if (isNavReady) {
-      console.log("[RootLayout] System Ready");
-      setIsReady(true);
-    }
-  }, [isMounted, isHydrated, rootNavigationState?.key]);
-
-  // Bước 3: Logic điều hướng (Chỉ chạy khi đã sẵn sàng)
-  useEffect(() => {
-    if (!isReady || !isMounted) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
+    const inAuthGroup = segments[0] === "(auth)";
 
     if (!token) {
+      // Nếu không có token -> Bắt buộc về Login (nếu đang không ở đó)
       if (!inAuthGroup) {
         router.replace("/(auth)/login");
       }
-    } else if (user && inAuthGroup) {
-      const role = user.role || 'user';
-      if (role === 'admin') router.replace("/(admin)/dashboard");
-      else if (role === 'owner') router.replace("/owner/");
+    } else if (inAuthGroup) {
+      // Nếu đã có token mà lỡ vào vùng auth -> Đẩy ra dashboard tương ứng
+      const role = user?.role || "customer";
+      if (role === "admin") router.replace("/(admin)/dashboard");
+      else if (role === "owner") router.replace("/owner/");
       else router.replace("/(user)/");
     }
-  }, [token, user, segments, isReady, isMounted]);
+  }, [token, isHydrated, isMounted, segments]);
 
-  // Nếu chưa mounted thì không render gì cả (Tránh lỗi React 19 Hydration)
-  if (!isMounted) return null;
+  // Không render gì khi chưa Hydrate để tránh nháy màn hình/sai lệch điều hướng
+  if (!isHydrated || !isMounted) {
+    return (
+      <View style={styles.fullLoading}>
+        <ActivityIndicator size="large" color="#22C55E" />
+      </View>
+    );
+  }
 
   return (
     <PaperProvider>
@@ -65,29 +55,15 @@ export default function RootLayout() {
         <Stack.Screen name="(admin)" />
         <Stack.Screen name="owner" />
       </Stack>
-
-      {!isReady && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#22C55E" />
-          <Text style={styles.loadingText}>Đang khởi tạo hệ thống...</Text>
-        </View>
-      )}
     </PaperProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 99999,
+  fullLoading: {
+    flex: 1,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500'
-  }
 });

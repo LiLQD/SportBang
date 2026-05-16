@@ -22,7 +22,7 @@ export const bookingService = {
 
   cancelBooking: async (id) => {
     return await apiCall(`/bookings/${id}/cancel`, {
-      method: "PUT",
+      method: "PATCH",
     });
   },
 

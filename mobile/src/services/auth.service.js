@@ -34,4 +34,10 @@ export const authService = {
       body: JSON.stringify(passwordData),
     });
   },
+
+  logout: async () => {
+    return await apiCall("/auth/logout", {
+      method: "POST",
+    });
+  },
 };
