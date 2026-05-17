@@ -71,7 +71,7 @@ export default function OwnerDashboard() {
         </View>
         <TouchableOpacity
           style={styles.notifBtn}
-          onPress={() => router.push("/(owner)/notifications" as any)}
+          onPress={() => router.push("/owner/notifications" as any)}
         >
           <Ionicons name="notifications-outline" size={24} color="#fff" />
           <View style={styles.badge} />
@@ -99,7 +99,7 @@ export default function OwnerDashboard() {
             <View style={styles.actionGrid}>
               <TouchableOpacity
                 style={[styles.actionItem, darkMode && { backgroundColor: "#1F2937" }]}
-                onPress={() => router.push("/(owner)/(tabs)/bookings" as any)}
+                onPress={() => router.push("/owner/bookings" as any)}
               >
                 <View style={[styles.actionIcon, { backgroundColor: '#E0F2FE' }]}>
                   <Ionicons name="list" size={24} color="#0EA5E9" />
@@ -109,7 +109,7 @@ export default function OwnerDashboard() {
 
               <TouchableOpacity
                 style={[styles.actionItem, darkMode && { backgroundColor: "#1F2937" }]}
-                onPress={() => router.push("/(owner)/(tabs)/fields" as any)}
+                onPress={() => router.push("/owner/add-field" as any)}
               >
                 <View style={[styles.actionIcon, { backgroundColor: '#DCFCE7' }]}>
                   <Ionicons name="add" size={24} color="#22C55E" />
@@ -119,7 +119,7 @@ export default function OwnerDashboard() {
 
               <TouchableOpacity
                 style={[styles.actionItem, darkMode && { backgroundColor: "#1F2937" }]}
-                onPress={() => router.push("/(owner)/(tabs)/revenue" as any)}
+                onPress={() => router.push("/owner/revenue" as any)}
               >
                 <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
                   <Ionicons name="pie-chart" size={24} color="#D97706" />

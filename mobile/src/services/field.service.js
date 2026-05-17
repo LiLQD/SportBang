@@ -19,4 +19,24 @@ export const fieldService = {
       method: "GET",
     });
   },
+
+  createField: async (fieldData) => {
+    return await apiCall("/fields", {
+      method: "POST",
+      body: JSON.stringify(fieldData),
+    });
+  },
+
+  updateField: async (id, fieldData) => {
+    return await apiCall(`/fields/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(fieldData),
+    });
+  },
+
+  deleteField: async (id) => {
+    return await apiCall(`/fields/${id}`, {
+      method: "DELETE",
+    });
+  },
 };

@@ -16,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fieldService } from "@/src/services/field.service";
-import { bookingService } from "@/src/services/booking.service";
-import { getShadow } from "@/src/utils/style";
-import { useAuthStore } from "@/src/store/auth.store";
+import { fieldService } from "../../src/services/field.service";
+import { bookingService } from "../../src/services/booking.service";
+import { getImageUrl } from "../../src/utils/helpers";
+import { getShadow } from "../../src/utils/style";
+import { useAuthStore } from "../../src/store/auth.store";
 
 const TIME_SLOTS = [
   "09:00", "10:00", "11:00", "12:00", "13:00", "14:00",
@@ -35,10 +36,17 @@ export default function BookingScreen() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [duration, setDuration] = useState(1);
+  const [busySlots, setBusySlots] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) fetchFieldDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (selectedDate && id) {
+      fetchBusySlots();
+    }
+  }, [selectedDate, id]);
 
   const fetchFieldDetails = async () => {
     try {
@@ -55,7 +63,16 @@ export default function BookingScreen() {
     }
   };
 
-  const calculateTotal = () => (field?.price_per_hour || 0) * duration;
+  const fetchBusySlots = async () => {
+    try {
+      const res = await bookingService.getBusySlots(id, selectedDate);
+      if (res.success) {
+        setBusySlots(res.data);
+      }
+    } catch (error) {
+      console.error("Error fetching busy slots:", error);
+    }
+  };
 
   const addHours = (time: string, hours: number) => {
     if (!time) return "";
@@ -64,10 +81,30 @@ export default function BookingScreen() {
     return `${newH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
   };
 
+  const isTimeBusy = (time: string) => {
+    return busySlots.some(slot => {
+      return time >= slot.start && time < slot.end;
+    });
+  };
+
+  const isRangeBusy = (start: string, durationHours: number) => {
+    const end = addHours(start, durationHours);
+    return busySlots.some(slot => {
+      return start < slot.end && slot.start < end;
+    });
+  };
+
+  const calculateTotal = () => (field?.price_per_hour || 0) * duration;
+
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime) {
       const msg = "Vui lòng chọn ngày và giờ";
       return Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Thông báo", msg);
+    }
+
+    if (isRangeBusy(selectedTime, duration)) {
+      const msg = "Khoảng thời gian bạn chọn có một phần đã bị người khác đặt. Vui lòng chọn giờ khác.";
+      return Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Lỗi", msg);
     }
 
     try {
@@ -80,10 +117,9 @@ export default function BookingScreen() {
           start: selectedTime,
           end: addHours(selectedTime, duration)
         },
-        payment_method: 'cash' // Default to cash for now
+        payment_method: 'cash'
       };
 
-      console.log("[Booking] Sending payload:", payload);
       await bookingService.createBooking(payload);
 
       const successMsg = "Đã đặt sân thành công!";
@@ -116,29 +152,29 @@ export default function BookingScreen() {
             <TouchableOpacity style={[styles.backButton, darkMode && { backgroundColor: "#1F2937" }]} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={24} color={darkMode ? "#fff" : "#111827"} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, darkMode && { color: "#fff" }]}>Book Field</Text>
+            <Text style={[styles.headerTitle, darkMode && { color: "#fff" }]}>Đặt sân</Text>
             <View style={{ width: 40 }} />
           </View>
           <View style={{ paddingHorizontal: 20 }}>
-            <Text style={[styles.title, darkMode && { color: "#fff" }]}>Book Your Field</Text>
-            <Text style={[styles.subtitle, darkMode && { color: "#9CA3AF" }]}>Select your preferred date and time</Text>
+            <Text style={[styles.title, darkMode && { color: "#fff" }]}>{field.field_name}</Text>
+            <Text style={[styles.subtitle, darkMode && { color: "#9CA3AF" }]}>Vui lòng chọn ngày và giờ muốn đặt</Text>
           </View>
         </SafeAreaView>
 
         <View style={[styles.fieldCard, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Image source={{ uri: field.images?.[0] || "https://images.unsplash.com/photo-1641029185333-7ed62a19d5f0" }} style={styles.fieldImage} />
+          <Image source={{ uri: getImageUrl(field.images?.[0]) }} style={styles.fieldImage} />
           <View style={styles.fieldInfo}>
             <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{field.field_name}</Text>
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={16} color="#FACC15" />
               <Text style={[styles.rating, darkMode && { color: "#fff" }]}>{field.users_rate || "5.0"}</Text>
-              <Text style={[styles.review, darkMode && { color: "#9CA3AF" }]}>({field.reviewCount || 0} reviews)</Text>
+              <Text style={[styles.review, darkMode && { color: "#9CA3AF" }]}>({field.reviewCount || 0} đánh giá)</Text>
             </View>
           </View>
         </View>
 
         <View style={[styles.calendarContainer, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Select Date</Text>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Chọn ngày</Text>
           <Calendar
             onDayPress={(day) => setSelectedDate(day.dateString)}
             markedDates={{ [selectedDate]: { selected: true, selectedColor: "#22C55E" } }}
@@ -157,30 +193,36 @@ export default function BookingScreen() {
         </View>
 
         <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Select Time Slot</Text>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Chọn giờ bắt đầu</Text>
           <View style={styles.timeGrid}>
-            {TIME_SLOTS.map((slot) => (
-              <TouchableOpacity
-                key={slot}
-                style={[
-                  styles.timeButton,
-                  darkMode && { borderColor: "#374151" },
-                  selectedTime === slot && styles.timeButtonActive
-                ]}
-                onPress={() => setSelectedTime(slot)}
-              >
-                <Text style={[
-                  styles.timeText,
-                  darkMode && { color: "#9CA3AF" },
-                  selectedTime === slot && styles.timeTextActive
-                ]}>{slot}</Text>
-              </TouchableOpacity>
-            ))}
+            {TIME_SLOTS.map((slot) => {
+              const busy = isTimeBusy(slot);
+              return (
+                <TouchableOpacity
+                  key={slot}
+                  disabled={busy}
+                  style={[
+                    styles.timeButton,
+                    darkMode && { borderColor: "#374151" },
+                    selectedTime === slot && styles.timeButtonActive,
+                    busy && { backgroundColor: darkMode ? "#374151" : "#E5E7EB", borderColor: "transparent", opacity: 0.5 }
+                  ]}
+                  onPress={() => setSelectedTime(slot)}
+                >
+                  <Text style={[
+                    styles.timeText,
+                    darkMode && { color: "#9CA3AF" },
+                    selectedTime === slot && styles.timeTextActive,
+                    busy && { color: "#9CA3AF", textDecorationLine: 'line-through' }
+                  ]}>{slot}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Select Duration (Hours)</Text>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Thời lượng (Giờ)</Text>
           <View style={styles.durationRow}>
             <TouchableOpacity
               style={[styles.durationBtn, darkMode && { backgroundColor: "#064E3B" }]}
@@ -189,7 +231,7 @@ export default function BookingScreen() {
               <Ionicons name="remove" size={24} color="#22C55E" />
             </TouchableOpacity>
 
-            <Text style={[styles.durationText, darkMode && { color: "#fff" }]}>{duration} {duration > 1 ? 'hours' : 'hour'}</Text>
+            <Text style={[styles.durationText, darkMode && { color: "#fff" }]}>{duration} giờ</Text>
 
             <TouchableOpacity
               style={[styles.durationBtn, darkMode && { backgroundColor: "#064E3B" }]}
@@ -201,11 +243,11 @@ export default function BookingScreen() {
         </View>
 
         <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Price Summary</Text>
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Tóm tắt thanh toán</Text>
           <View style={styles.summaryRow}>
             <View>
               <Text style={[styles.summaryLabel, darkMode && { color: "#fff" }]}>{field.field_name}</Text>
-              <Text style={[styles.summarySub, darkMode && { color: "#9CA3AF" }]}>{duration} hour(s) x {field.price_per_hour?.toLocaleString('vi-VN')}đ</Text>
+              <Text style={[styles.summarySub, darkMode && { color: "#9CA3AF" }]}>{duration} giờ x {field.price_per_hour?.toLocaleString('vi-VN')}đ</Text>
             </View>
             <Text style={styles.totalPrice}>{calculateTotal()?.toLocaleString('vi-VN')}đ</Text>
           </View>
@@ -218,7 +260,7 @@ export default function BookingScreen() {
           style={[styles.confirmButton, (!selectedTime || bookingLoading) && { backgroundColor: "#9CA3AF" }]}
           onPress={handleConfirmBooking}
         >
-          {bookingLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Confirm Booking - {calculateTotal()?.toLocaleString('vi-VN')}đ</Text>}
+          {bookingLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Xác nhận đặt - {calculateTotal()?.toLocaleString('vi-VN')}đ</Text>}
         </TouchableOpacity>
       </View>
     </View>

@@ -34,8 +34,14 @@ export const bookingService = {
 
   updateBookingStatus: async (id, status) => {
     return await apiCall(`/bookings/${id}/status`, {
-      method: "PUT",
+      method: "PATCH",
       body: JSON.stringify({ status }),
+    });
+  },
+
+  getBusySlots: async (fieldId, date) => {
+    return await apiCall(`/bookings/busy-slots?fieldId=${fieldId}&date=${date}`, {
+      method: "GET",
     });
   },
 };

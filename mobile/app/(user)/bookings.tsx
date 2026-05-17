@@ -10,12 +10,14 @@ import {
   Modal,
   TextInput,
   Platform,
+  RefreshControl,
 } from "react-native";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { bookingService } from "@/src/services/booking.service";
+import { getImageUrl } from "@/src/utils/helpers";
 import { reviewService } from "@/src/services/review.service";
+import { bookingService } from "@/src/services/booking.service";
 import { getShadow } from "@/src/utils/style";
 import { useAuthStore } from "@/src/store/auth.store";
 
@@ -28,12 +30,12 @@ export default function BookingScreen() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { fetchBookings(); }, []);
 
   const fetchBookings = async () => {
     try {
-      setLoading(true);
       const res = await bookingService.getMyBookings();
       if (res && res.data) {
         setBookings(res.data);
@@ -45,21 +47,79 @@ export default function BookingScreen() {
       setBookings([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleCancelBooking = async (id: string) => {
-    Alert.alert("Xác nhận", "Bạn có chắc muốn hủy?", [
-      { text: "Không", style: "cancel" },
-      { text: "Có", onPress: async () => {
-          try {
-            await bookingService.cancelBooking(id);
-            fetchBookings();
-          } catch (error: any) {
-            Alert.alert("Lỗi", error.message);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchBookings();
+  }, []);
+
+  const handleCancelBooking = (id: string) => {
+    // 1. Log để kiểm tra trong console debug
+    console.log("[BookingScreen] Clicked Cancel for ID:", id);
+
+    // 2. Alert đơn giản để xác nhận nút có hoạt động hay không
+    if (!id) {
+      alert("Lỗi: Không tìm thấy ID đơn đặt sân.");
+      return;
+    }
+
+    const msg = "Bạn có chắc chắn muốn hủy đơn đặt sân này không?";
+
+    const executeCancel = async () => {
+      try {
+        setLoading(true);
+        console.log("[BookingScreen] Gọi API hủy sân...");
+        const response = await bookingService.cancelBooking(id);
+        console.log("[BookingScreen] Kết quả API:", response);
+
+        const successMsg = "Đã hủy đơn đặt sân thành công.";
+        if (Platform.OS === 'web') {
+          window.alert(successMsg);
+        } else {
+          Alert.alert("Thành công", successMsg);
+        }
+
+        await fetchBookings();
+      } catch (error: any) {
+        console.error("[BookingScreen] Lỗi khi hủy:", error);
+        const errorMsg = error.message || "Không thể hủy đơn đặt sân lúc này.";
+        if (Platform.OS === 'web') {
+          window.alert("Lỗi: " + errorMsg);
+        } else {
+          Alert.alert("Lỗi", errorMsg);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // 3. Xử lý xác nhận linh hoạt cho Web và Mobile
+    if (Platform.OS === 'web') {
+      const confirmCancel = window.confirm(msg);
+      if (confirmCancel) {
+        executeCancel();
+      }
+    } else {
+      Alert.alert(
+        "Xác nhận hủy",
+        msg,
+        [
+          { text: "Quay lại", style: "cancel" },
+          {
+            text: "Hủy sân",
+            style: "destructive",
+            onPress: () => {
+              console.log("[BookingScreen] User confirmed cancellation");
+              executeCancel();
+            }
           }
-      }}
-    ]);
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   const submitReview = async () => {
@@ -83,7 +143,7 @@ export default function BookingScreen() {
 
   const renderBooking = ({ item }: { item: any }) => (
     <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
-      <Image source={{ uri: item.field_id?.images?.[0] }} style={styles.image} />
+      <Image source={{ uri: getImageUrl(item.field_id?.images?.[0]) }} style={styles.image} />
       <View style={styles.contentContainer}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.field_id?.field_name || "Sân bóng"}</Text>
@@ -93,10 +153,15 @@ export default function BookingScreen() {
             <Text style={[styles.badgeText, item.status === 'cancelled' && { color: '#EF4444' }, darkMode && item.status !== 'cancelled' && { color: '#60A5FA' }]}>{item.status.toUpperCase()}</Text>
           </View>
         </View>
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 8, justifyContent: 'center' }}>
           {(item.status === 'pending' || item.status === 'confirmed') && (
-            <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelBooking(item._id)}>
-              <Text style={styles.cancelText}>Hủy</Text>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => handleCancelBooking(item._id)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <Text style={styles.cancelText}>Hủy sân</Text>
             </TouchableOpacity>
           )}
           {item.status === 'completed' && (
@@ -119,6 +184,14 @@ export default function BookingScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderBooking}
         ListEmptyComponent={<Text style={styles.emptyText}>Chưa có lịch đặt nào</Text>}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#22C55E"]}
+            tintColor={darkMode ? "#fff" : "#22C55E"}
+          />
+        }
       />
       <Modal visible={isReviewModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
