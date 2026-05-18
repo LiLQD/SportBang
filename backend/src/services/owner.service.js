@@ -39,11 +39,32 @@ const getDashboard = async (user) => {
     ? { field_name: topFieldAgg[0].field.field_name, total_bookings: topFieldAgg[0].count }
     : null;
 
+  // Monthly Revenue for Charts
+  const monthlyRevenue = await Booking.aggregate([
+    {
+      $match: {
+        field_id: { $in: fieldIds },
+        status: { $in: ['confirmed', 'completed'] }
+      }
+    },
+    {
+      $group: {
+        _id: { $month: "$booking_date" },
+        revenue: { $sum: "$total_price" }
+      }
+    },
+    { $sort: { "_id": 1 } }
+  ]);
+
   return {
     total_fields,
     total_bookings: stats.total_bookings,
     total_revenue: stats.total_revenue,
-    top_field
+    top_field,
+    monthly_revenue: monthlyRevenue.map(item => ({
+      month: item._id,
+      revenue: item.revenue
+    }))
   };
 };
 

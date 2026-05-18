@@ -19,6 +19,11 @@ const fieldSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  sport_type: {
+    type: String,
+    required: true,
+    default: 'Bóng đá'
+  },
   field_type: {
     type: String,
     required: true,
@@ -64,14 +69,5 @@ const fieldSchema = new mongoose.Schema({
     default: false
   }
 }, { timestamps: true });
-
-// Ensure customers don't see deleted fields by default
-fieldSchema.pre('find', function() {
-  this.where({ isDeleted: false });
-});
-
-fieldSchema.pre('findOne', function() {
-  this.where({ isDeleted: false });
-});
 
 module.exports = mongoose.model('Field', fieldSchema);

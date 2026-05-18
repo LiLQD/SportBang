@@ -8,7 +8,7 @@ const toggleFavorite = async (userId, fieldId) => {
   const field = await Field.findById(fieldId);
   if (!field) throw new Error('Field not found');
 
-  const index = user.favorites.indexOf(fieldId);
+  const index = user.favorites.findIndex(id => id.toString() === fieldId.toString());
   if (index === -1) {
     user.favorites.push(fieldId);
   } else {

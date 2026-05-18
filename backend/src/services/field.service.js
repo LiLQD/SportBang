@@ -1,4 +1,5 @@
 const Field = require('../models/Field');
+const mongoose = require('mongoose');
 
 const timeToMinutes = (time) => {
   if (!time || !time.includes(':')) return 0;
@@ -29,22 +30,50 @@ const validateSlots = (slots) => {
 const getAllFields = async (query, user) => {
   const filter = { isDeleted: false };
   
-  // Customers should not see inactive fields
+  // Khách hàng chỉ thấy các sân đang hoạt động
   if (!user || user.role === 'customer') {
     filter.status = 'active';
   }
   
-  // Optional search by name
-  if (query.field_name) {
-    filter.field_name = { $regex: query.field_name, $options: 'i' };
+  // Tìm kiếm theo tên (không phân biệt hoa thường)
+  if (query.search) {
+    filter.field_name = { $regex: query.search, $options: 'i' };
   }
   
-  // Optional filter by owner
+  // Lọc theo loại môn thể thao (Bóng đá, Cầu lông,...)
+  if (query.sport_type && query.sport_type !== 'Tất cả') {
+    filter.sport_type = query.sport_type;
+  }
+
+  // Lọc theo chủ sân (nếu cần)
   if (query.owner_id) {
     filter.owner_id = query.owner_id;
   }
 
-  return await Field.find(filter).populate('owner_id', 'full_name email phone');
+  return await Field.find(filter)
+    .populate('owner_id', 'full_name email phone')
+    .sort({ createdAt: -1 });
+};
+
+const getFieldsByOwner = async (ownerId) => {
+  try {
+    const idStr = ownerId.toString();
+    const queryId = new mongoose.Types.ObjectId(idStr);
+
+    console.log(`[Service] Đang tìm sân cho ID: ${queryId}`);
+
+    // Truy vấn linh hoạt: Lấy mọi sân của chủ sở hữu này trừ những sân có isDeleted là true
+    const fields = await Field.find({
+      owner_id: queryId,
+      isDeleted: { $ne: true }
+    }).sort({ createdAt: -1 });
+
+    console.log(`[Service] Kết quả: Tìm thấy ${fields.length} sân trong cơ sở dữ liệu.`);
+    return fields;
+  } catch (error) {
+    console.error("[Service] Lỗi khi truy vấn danh sách sân:", error);
+    return [];
+  }
 };
 
 const getFieldById = async (id, user) => {
@@ -64,10 +93,13 @@ const createField = async (payload, ownerId) => {
   if (payload.available_time) {
     validateSlots(payload.available_time);
   }
-  
+
+  // Đảm bảo owner_id được lưu dưới dạng ObjectId chuẩn
+  const finalOwnerId = new mongoose.Types.ObjectId(ownerId.toString());
+
   return await Field.create({
     ...payload,
-    owner_id: ownerId
+    owner_id: finalOwnerId
   });
 };
 
@@ -194,6 +226,7 @@ const removeImage = async (fieldId, imagePath, user) => {
 module.exports = {
   getAllFields,
   getFieldById,
+  getFieldsByOwner,
   createField,
   updateField,
   updateFieldStatus,

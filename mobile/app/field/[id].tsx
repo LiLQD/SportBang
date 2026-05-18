@@ -141,9 +141,15 @@ export default function FieldDetailScreen() {
     );
   }
 
-  const fieldImages = field.images?.length > 0 ? field.images : [
-    "https://images.unsplash.com/photo-1716745559715-282bb61e3012",
-  ];
+  // Khai báo các biến bổ trợ hiển thị (Phải đặt sau check !field)
+  const totalReviews = reviews.length;
+  const averageRating = totalReviews > 0
+    ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / totalReviews).toFixed(1)
+    : (field.users_rate || "5.0");
+
+  const fieldImages = field.images && field.images.length > 0
+    ? field.images
+    : ["https://images.unsplash.com/photo-1716745559715-282bb61e3012"];
 
   return (
     <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
@@ -192,11 +198,11 @@ export default function FieldDetailScreen() {
               />
 
               <Text style={[styles.rating, darkMode && { color: "#fff" }]}>
-                {field.users_rate || "5.0"}
+                {averageRating}
               </Text>
 
               <Text style={[styles.review, darkMode && { color: "#9CA3AF" }]}>
-                ({field.reviewCount || 0} reviews)
+                ({totalReviews} reviews)
               </Text>
             </View>
           </View>

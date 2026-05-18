@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const Field = require('../models/Field');
+const Notification = require('../models/Notification');
+const Payment = require('../models/Payment');
 
 const timeToMinutes = (time) => {
   if (!time || !time.includes(':')) return 0;
@@ -85,6 +87,23 @@ const createBooking = async (user, payload) => {
     status: 'confirmed'
   });
 
+  // 6. Create Payment automatically
+  await Payment.create({
+    booking_id: booking._id,
+    amount: total_price,
+    payment_method: payload.payment_method || 'cash',
+    payment_status: 'pending'
+  });
+
+  // Create notification for user
+  await Notification.create({
+    user_id: user._id,
+    title: 'Booking Confirmed!',
+    message: `Your booking at ${field.field_name} for ${booking_slot.start} - ${booking_slot.end} on ${new Date(booking_date).toLocaleDateString()} has been confirmed.`,
+    type: 'booking',
+    data: { booking_id: booking._id }
+  });
+
   return booking;
 };
 
@@ -118,36 +137,83 @@ const cancelBooking = async (id, user) => {
   const booking = await Booking.findById(id);
   
   if (!booking) {
-    throw new Error('Booking not found');
+    throw new Error('Đơn đặt sân không tồn tại.');
   }
 
+  // Kiểm tra quyền sở hữu
   if (booking.user_id.toString() !== user._id.toString()) {
-    throw new Error('Not authorized to cancel this booking');
+    throw new Error('Bạn không có quyền hủy đơn đặt này.');
   }
 
   if (booking.status === 'cancelled') {
-    throw new Error('Booking is already cancelled');
+    throw new Error('Đơn này đã được hủy trước đó.');
   }
   
   if (booking.status !== 'pending' && booking.status !== 'confirmed') {
-    throw new Error(`Cannot cancel booking in ${booking.status} status`);
+    throw new Error(`Không thể hủy đơn đang ở trạng thái: ${booking.status}`);
   }
 
-  // Calculate 24h difference
-  // Combine booking_date and booking_slot.start
+  // Tính toán thời gian bắt đầu của sân theo UTC
   const [hours, minutes] = booking.booking_slot.start.split(':').map(Number);
   const bookingDateTime = new Date(booking.booking_date);
+  // Vì booking_date đã lưu ở 00:00 UTC, ta set giờ bắt đầu cũng theo UTC
   bookingDateTime.setUTCHours(hours, minutes, 0, 0);
 
   const now = new Date();
-  const diffHours = (bookingDateTime - now) / (1000 * 60 * 60);
+  const diffMs = bookingDateTime.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
 
+  console.log(`[CancelBooking] BookingTime: ${bookingDateTime.toISOString()}, Now: ${now.toISOString()}, DiffHours: ${diffHours}`);
+
+  // Cho phép hủy nếu thời gian hiện tại còn cách giờ bắt đầu ít nhất 24h
   if (diffHours < 24) {
-    throw new Error('Can only cancel booking at least 1 day in advance');
+    throw new Error('Bạn chỉ có thể hủy sân trước giờ bắt đầu ít nhất 24 tiếng.');
   }
 
   booking.status = 'cancelled';
-  return await booking.save();
+  const savedBooking = await booking.save();
+
+  // Create notification for user
+  await Notification.create({
+    user_id: user._id,
+    title: 'Booking Cancelled',
+    message: `You have successfully cancelled your booking at ${bookingDateTime.toLocaleDateString()}.`,
+    type: 'booking',
+    data: { booking_id: booking._id }
+  });
+
+  return savedBooking;
+};
+
+const updateBookingStatus = async (id, status, user) => {
+  const booking = await Booking.findById(id).populate('field_id');
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  // Check if user is owner of the field
+  if (user.role !== 'admin' && booking.field_id.owner_id.toString() !== user._id.toString()) {
+    throw new Error('Not authorized to update this booking status');
+  }
+
+  const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    throw new Error('Invalid status');
+  }
+
+  booking.status = status;
+  const savedBooking = await booking.save();
+
+  // Create notification for customer
+  await Notification.create({
+    user_id: booking.user_id,
+    title: 'Booking Status Updated',
+    message: `Your booking status has been updated to: ${status}`,
+    type: 'booking',
+    data: { booking_id: booking._id }
+  });
+
+  return savedBooking;
 };
 
 const getOwnerBookings = async (user) => {
@@ -167,11 +233,27 @@ const getAllBookings = async () => {
     .sort({ booking_date: -1, 'booking_slot.start': -1 });
 };
 
+const getBusySlots = async (fieldId, date) => {
+  const targetDate = new Date(date);
+  targetDate.setUTCHours(0, 0, 0, 0);
+
+  // Lấy các đơn đặt không phải trạng thái 'cancelled'
+  const bookings = await Booking.find({
+    field_id: fieldId,
+    booking_date: targetDate,
+    status: { $in: ['pending', 'confirmed', 'completed'] }
+  }).select('booking_slot');
+
+  return bookings.map(b => b.booking_slot);
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
   getBookingById,
   cancelBooking,
+  updateBookingStatus,
   getOwnerBookings,
-  getAllBookings
+  getAllBookings,
+  getBusySlots
 };

@@ -33,6 +33,17 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'blocked'],
     default: 'active'
+  },
+  favorites: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Field'
+    }],
+    default: []
+  },
+  refresh_token: {
+    type: String,
+    select: false
   }
 }, { timestamps: true });
 

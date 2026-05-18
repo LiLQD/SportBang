@@ -19,11 +19,31 @@ const getDashboard = async () => {
 
   const stats = bookingStats[0] || { total_bookings: 0, total_revenue: 0 };
 
+  // Monthly revenue for admin (whole system)
+  const monthlyRevenue = await Booking.aggregate([
+    {
+      $match: {
+        status: { $in: ['confirmed', 'completed'] }
+      }
+    },
+    {
+      $group: {
+        _id: { $month: "$booking_date" },
+        revenue: { $sum: "$total_price" }
+      }
+    },
+    { $sort: { "_id": 1 } }
+  ]);
+
   return {
     total_users,
     total_fields,
     total_bookings: stats.total_bookings,
-    total_revenue: stats.total_revenue
+    total_revenue: stats.total_revenue,
+    monthly_revenue: monthlyRevenue.map(item => ({
+      month: item._id,
+      revenue: item.revenue
+    }))
   };
 };
 

@@ -197,7 +197,27 @@ export default function BookingScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, darkMode && { backgroundColor: "#1F2937" }]}>
             <Text style={[styles.modalTitle, darkMode && { color: "#fff" }]}>Đánh giá sân</Text>
-            <TextInput style={[styles.reviewInput, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]} multiline value={comment} onChangeText={setComment} placeholder="Cảm nhận của bạn..." placeholderTextColor="#9CA3AF" />
+
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                  <Ionicons
+                    name={star <= rating ? "star" : "star-outline"}
+                    size={32}
+                    color={star <= rating ? "#F59E0B" : "#9CA3AF"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={[styles.reviewInput, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+              multiline
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Cảm nhận của bạn..."
+              placeholderTextColor="#9CA3AF"
+            />
             <TouchableOpacity style={styles.submitBtn} onPress={submitReview} disabled={isSubmitting}>
               {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={{color:'#fff', fontWeight: 'bold'}}>Gửi</Text>}
             </TouchableOpacity>
@@ -228,6 +248,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center' },
   modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 15 },
+  starsContainer: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   reviewInput: { width: '100%', height: 100, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 10, marginBottom: 15 },
   submitBtn: { backgroundColor: '#22C55E', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' }
 });
