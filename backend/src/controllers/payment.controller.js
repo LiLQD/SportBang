@@ -28,6 +28,15 @@ const getMyPayments = async (req, res) => {
   }
 };
 
+const getPaymentById = async (req, res) => {
+  try {
+    const payment = await paymentService.getPaymentById(req.params.id, req.user);
+    return sendResponse(res, 200, true, 'Payment fetched successfully', payment);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 const simulatePaymentPage = async (req, res) => {
   const { id } = req.params;
   const { method } = req.query;
@@ -110,6 +119,7 @@ module.exports = {
   createPayment,
   updatePaymentStatus,
   getMyPayments,
+  getPaymentById,
   simulatePaymentPage,
   processSimulation,
   simulationCallback

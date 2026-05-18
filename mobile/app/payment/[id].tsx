@@ -32,10 +32,11 @@ export default function PaymentDetailScreen() {
 
   const fetchPaymentDetail = async () => {
     try {
-      const res = await paymentService.getMyPayments();
-      if (res && res.data) {
-        const found = res.data.find((p: any) => p._id === id);
-        setPayment(found);
+      const res = await paymentService.getPaymentById(id as string);
+      if (res && res.success) {
+        setPayment(res.data);
+      } else {
+        console.error("Payment not found in response");
       }
     } catch (error) {
       console.error("Error fetching payment:", error);
@@ -47,6 +48,7 @@ export default function PaymentDetailScreen() {
   const handlePayment = async (method: string) => {
     try {
       setProcessing(true);
+      const methodKey = method.toLowerCase();
 
       if (method === 'Tiền mặt') {
         await paymentService.updatePaymentStatus(id as string, 'pending');
@@ -57,24 +59,26 @@ export default function PaymentDetailScreen() {
         return;
       }
 
-      // Đối với MoMo/VNPAY/Banking: Gọi lại API createPayment để lấy payment_url
-      // Lưu ý: Ở đây ta cập nhật phương thức thanh toán trước
-      const methodKey = method.toLowerCase();
+      // Gọi API để cập nhật phương thức và lấy URL thanh toán mô phỏng
+      const res = await paymentService.createPayment({
+        booking_id: payment.booking_id._id,
+        payment_method: methodKey
+      });
 
-      // Thử lấy payment_url từ API createPayment (nếu backend cho phép update hoặc tạo mới)
-      // Nhưng theo logic hiện tại, ta sẽ dùng URL mô phỏng trực tiếp từ ID và phương thức
+      if (res.success && res.data.payment_url) {
+        const paymentUrl = res.data.payment_url;
 
-      const baseUrl = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
-      const simulateUrl = `${baseUrl}/api/payments/simulate/${id}?method=${methodKey}`;
+        if (Platform.OS === 'web') {
+          window.open(paymentUrl, '_blank');
+        } else {
+          await WebBrowser.openBrowserAsync(paymentUrl);
+        }
 
-      if (Platform.OS === 'web') {
-        window.open(simulateUrl, '_blank');
+        // Refresh lại dữ liệu sau khi người dùng quay lại từ trình duyệt
+        setTimeout(() => fetchPaymentDetail(), 2000);
       } else {
-        await WebBrowser.openBrowserAsync(simulateUrl);
+        throw new Error(res.message || "Không thể khởi tạo thanh toán");
       }
-
-      // Sau khi quay lại, tải lại dữ liệu
-      fetchPaymentDetail();
 
     } catch (error: any) {
       const errorMsg = error.message || "Thanh toán thất bại. Vui lòng thử lại.";

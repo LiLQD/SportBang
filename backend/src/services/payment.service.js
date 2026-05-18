@@ -22,30 +22,37 @@ const createPayment = async (user, payload) => {
     throw new Error(`Cannot pay for a ${booking.status} booking`);
   }
 
-  const existingPayment = await Payment.findOne({ booking_id });
-  if (existingPayment) {
-    throw new Error('Payment already exists for this booking');
+  let payment = await Payment.findOne({ booking_id });
+
+  if (payment) {
+    if (payment.payment_status === 'paid') {
+      throw new Error('Đơn hàng này đã được thanh toán trước đó.');
+    }
+    // Cập nhật phương thức thanh toán mới
+    payment.payment_method = payment_method;
+    await payment.save();
+  } else {
+    payment = await Payment.create({
+      booking_id,
+      amount: booking.total_price,
+      payment_method,
+      payment_status: 'pending'
+    });
   }
 
-  const payment = await Payment.create({
-    booking_id,
-    amount: booking.total_price,
-    payment_method,
-    payment_status: 'pending'
-  });
+  console.log(`[Payment] Khởi tạo thanh toán: ${payment._id} (${payment_method})`);
 
-  console.log(`[Payment] Đã khởi tạo giao dịch ${payment._id} (${payment_method}) cho đơn ${booking_id}`);
-
-  // Tạo URL thanh toán giả lập cho MoMo/VNPAY/Banking
+  // Tạo URL thanh toán giả lập
   let payment_url = null;
-  if (['momo', 'vnpay', 'banking', 'visa'].includes(payment_method)) {
-    // Trong thực tế, đây sẽ là gọi API của MoMo/VNPAY để lấy link
-    // Ở đây ta tạo link dẫn đến một route giả lập trên server của mình
-    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const methodsWithUrl = ['momo', 'vnpay', 'banking', 'visa'];
+
+  if (methodsWithUrl.includes(payment_method.toLowerCase())) {
+    // Sử dụng IP host của Android Emulator nếu đang chạy local
+    const baseUrl = process.env.BASE_URL || `http://10.0.2.2:3000`;
     payment_url = `${baseUrl}/api/payments/simulate/${payment._id}?method=${payment_method}`;
   }
 
-  return { ...payment._doc, payment_url };
+  return { ...payment.toObject(), payment_url };
 };
 
 const simulatePaymentProcess = async (paymentId, success) => {
@@ -131,9 +138,40 @@ const getMyPayments = async (user) => {
     .sort({ createdAt: -1 });
 };
 
+const getPaymentById = async (paymentId, user) => {
+  try {
+    const payment = await Payment.findById(paymentId).populate({
+      path: 'booking_id',
+      populate: { path: 'field_id', select: 'field_name address images owner_id' }
+    });
+
+    if (!payment) {
+      throw new Error('Không tìm thấy thông tin thanh toán.');
+    }
+
+    const booking = payment.booking_id;
+    if (!booking) {
+      throw new Error('Không tìm thấy thông tin đơn đặt sân liên quan.');
+    }
+
+    const isAdmin = user.role === 'admin';
+    const isBooker = booking.user_id && booking.user_id.toString() === user._id.toString();
+    const isOwner = booking.field_id && booking.field_id.owner_id && booking.field_id.owner_id.toString() === user._id.toString();
+
+    if (!isAdmin && !isBooker && !isOwner) {
+      throw new Error('Bạn không có quyền xem thông tin thanh toán này.');
+    }
+
+    return payment;
+  } catch (error) {
+    throw error;
+  }
+};
+
 module.exports = {
   createPayment,
   updatePaymentStatus,
   getMyPayments,
-  simulatePaymentProcess
+  simulatePaymentProcess,
+  getPaymentById
 };

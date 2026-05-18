@@ -117,18 +117,18 @@ export default function BookingScreen() {
           start: selectedTime,
           end: addHours(selectedTime, duration)
         },
-        payment_method: 'cash'
+        payment_method: 'momo' // Mặc định là momo để test luồng thanh toán online
       };
 
-      await bookingService.createBooking(payload);
+      const res = await bookingService.createBooking(payload);
 
-      const successMsg = "Đã đặt sân thành công!";
+      const successMsg = "Đã đặt sân thành công! Đang chuyển đến trang thanh toán...";
       if (Platform.OS === 'web') {
         window.alert(successMsg);
-        router.replace("/(user)/");
+        router.replace(`/payment/${res.data.payment_id}`);
       } else {
         Alert.alert("Thành công", successMsg, [
-          { text: "OK", onPress: () => router.replace("/(user)/") }
+          { text: "OK", onPress: () => router.replace(`/payment/${res.data.payment_id}`) }
         ]);
       }
     } catch (error: any) {

@@ -56,49 +56,63 @@ export default function PaymentHistoryScreen() {
     }
   };
 
-  const renderPaymentItem = ({ item }: { item: any }) => (
-    <View style={[styles.paymentCard, darkMode && { backgroundColor: "#1F2937" }]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.fieldInfo}>
-          <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.booking_id?.field_id?.field_name || "Sport Field"}</Text>
-          <Text style={[styles.date, darkMode && { color: "#9CA3AF" }]}>{new Date(item.createdAt).toLocaleDateString('vi-VN')} {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
+  const renderPaymentItem = ({ item }: { item: any }) => {
+    const isCash = item.payment_method?.toLowerCase() === 'cash';
+    const isConfirmed = item.booking_id?.status === 'confirmed';
+    const isPending = item.payment_status === 'pending';
+
+    return (
+      <View style={[styles.paymentCard, darkMode && { backgroundColor: "#1F2937" }]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.fieldInfo}>
+            <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.booking_id?.field_id?.field_name || "Sport Field"}</Text>
+            <Text style={[styles.date, darkMode && { color: "#9CA3AF" }]}>{new Date(item.createdAt).toLocaleDateString('vi-VN')} {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.payment_status) + '20' }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.payment_status) }]}>
+              {isCash && isPending && isConfirmed ? "CHỜ TẠI SÂN" : item.payment_status.toUpperCase()}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.payment_status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(item.payment_status) }]}>
-            {item.payment_status.toUpperCase()}
-          </Text>
+
+        <View style={[styles.divider, darkMode && { backgroundColor: "#374151" }]} />
+
+        <View style={styles.cardBody}>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Mã giao dịch:</Text>
+            <Text style={[styles.infoValue, darkMode && { color: "#D1D5DB" }]}>#{item._id.slice(-8).toUpperCase()}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Phương thức:</Text>
+            <Text style={[styles.infoValue, darkMode && { color: "#D1D5DB" }]}>
+              {isCash ? "Tiền mặt tại sân" : item.payment_method?.toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Trạng thái đơn:</Text>
+            <Text style={[styles.infoValue, { color: isConfirmed ? '#22C55E' : '#64748B', fontWeight: 'bold' }]}>
+              {item.booking_id?.status?.toUpperCase() || "N/A"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.cardFooter, darkMode && { borderTopColor: "#374151" }]}>
+          <View>
+            <Text style={[styles.amountLabel, darkMode && { color: "#fff" }]}>Tổng cộng</Text>
+            <Text style={styles.amountValue}>{item.amount?.toLocaleString('vi-VN')}đ</Text>
+          </View>
+          {isPending && !(isCash && isConfirmed) && (
+            <TouchableOpacity
+              style={styles.payNowBtn}
+              onPress={() => router.push(`/payment/${item._id}`)}
+            >
+              <Text style={styles.payNowText}>Thanh toán ngay</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-
-      <View style={[styles.divider, darkMode && { backgroundColor: "#374151" }]} />
-
-      <View style={styles.cardBody}>
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Mã giao dịch:</Text>
-          <Text style={[styles.infoValue, darkMode && { color: "#D1D5DB" }]}>#{item._id.slice(-8).toUpperCase()}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Phương thức:</Text>
-          <Text style={[styles.infoValue, darkMode && { color: "#D1D5DB" }]}>{item.payment_method}</Text>
-        </View>
-      </View>
-
-      <View style={[styles.cardFooter, darkMode && { borderTopColor: "#374151" }]}>
-        <View>
-          <Text style={[styles.amountLabel, darkMode && { color: "#fff" }]}>Tổng cộng</Text>
-          <Text style={styles.amountValue}>{item.amount?.toLocaleString('vi-VN')}đ</Text>
-        </View>
-        {item.payment_status === 'pending' && (
-          <TouchableOpacity
-            style={styles.payNowBtn}
-            onPress={() => router.push(`/payment/${item._id}`)}
-          >
-            <Text style={styles.payNowText}>Thanh toán ngay</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>

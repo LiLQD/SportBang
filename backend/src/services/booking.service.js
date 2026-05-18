@@ -84,11 +84,11 @@ const createBooking = async (user, payload) => {
     booking_date: date,
     booking_slot,
     total_price,
-    status: 'confirmed'
+    status: 'pending' // Chuyển thành pending để yêu cầu thanh toán/duyệt
   });
 
   // 6. Create Payment automatically
-  await Payment.create({
+  const payment = await Payment.create({
     booking_id: booking._id,
     amount: total_price,
     payment_method: payload.payment_method || 'cash',
@@ -104,7 +104,10 @@ const createBooking = async (user, payload) => {
     data: { booking_id: booking._id }
   });
 
-  return booking;
+  return {
+    ...booking.toObject(),
+    payment_id: payment._id
+  };
 };
 
 const getMyBookings = async (user) => {
@@ -204,11 +207,24 @@ const updateBookingStatus = async (id, status, user) => {
   booking.status = status;
   const savedBooking = await booking.save();
 
+  // Đồng bộ trạng thái thanh toán
+  const payment = await Payment.findOne({ booking_id: id });
+  if (payment) {
+    if (status === 'completed' && payment.payment_status !== 'paid') {
+      payment.payment_status = 'paid';
+      payment.payment_time = new Date();
+      await payment.save();
+    } else if (status === 'cancelled') {
+      payment.payment_status = 'failed';
+      await payment.save();
+    }
+  }
+
   // Create notification for customer
   await Notification.create({
     user_id: booking.user_id,
-    title: 'Booking Status Updated',
-    message: `Your booking status has been updated to: ${status}`,
+    title: 'Trạng thái đơn đặt sân đã cập nhật',
+    message: `Đơn đặt sân của bạn đã được chuyển sang trạng thái: ${status === 'confirmed' ? 'Đã duyệt' : status}`,
     type: 'booking',
     data: { booking_id: booking._id }
   });
