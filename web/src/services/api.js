@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api'; // Update with your backend URL
+const API_URL = 'http://localhost:3000/api'; // Đã cập nhật về cổng 3000
 
 const api = axios.create({
   baseURL: API_URL,
@@ -30,18 +30,31 @@ export const authService = {
 
 export const ownerService = {
   getDashboard: () => api.get('/owner/dashboard'),
+  getBookings: () => api.get('/owner/bookings'),
+};
+
+export const adminService = {
+  getDashboard: () => api.get('/admin/dashboard'),
+  getAllUsers: () => api.get('/admin/users'),
+  createUser: (data) => api.post('/admin/users', data),
+  toggleUserBlock: (id) => api.patch(`/admin/users/${id}/block`),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+  getAllFields: () => api.get('/admin/fields'),
+  updateFieldStatus: (id, status) => api.patch(`/admin/fields/${id}/status`, { status }),
+  getAllBookings: () => api.get('/admin/bookings'), // Cập nhật đúng route backend
 };
 
 export const fieldService = {
-  getMyFields: () => api.get('/field/owner/my-fields'),
-  createField: (data) => api.post('/field', data),
-  updateField: (id, data) => api.put(`/field/${id}`, data),
-  deleteField: (id) => api.delete(`/field/${id}`),
+  getMyFields: () => api.get('/fields/owner/my-fields'),
+  getAllFields: () => api.get('/fields'), // Admin dùng cái này
+  createField: (data) => api.post('/fields', data),
+  updateField: (id, data) => api.put(`/fields/${id}`, data),
+  deleteField: (id) => api.delete(`/fields/${id}`),
 };
 
 export const bookingService = {
-  getOwnerBookings: () => api.get('/booking/owner'),
-  getAllBookings: () => api.get('/booking/admin/all'),
+  getOwnerBookings: () => api.get('/owner/bookings'),
+  getAllBookings: () => api.get('/admin/bookings'),
   updateStatus: (id, status) => api.patch(`/booking/${id}/status`, { status }),
 };
 

@@ -9,7 +9,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import Sidebar from '../components/Sidebar';
-import { bookingService, fieldService } from '../services/api';
+import { bookingService, fieldService, ownerService, adminService } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -31,40 +31,51 @@ const Dashboard = () => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        const dashboardRes = await ownerService.getDashboard();
-        const bookingsRes = await bookingService.getOwnerBookings();
+        let dashboardRes;
+        let bookingsRes;
 
-        const data = dashboardRes.data.data;
+        if (role === 'admin') {
+          // Admin specific dashboard data
+          dashboardRes = await adminService.getDashboard();
+          bookingsRes = await bookingService.getAllBookings();
+        } else {
+          // Owner specific dashboard data
+          dashboardRes = await ownerService.getDashboard();
+          bookingsRes = await bookingService.getOwnerBookings();
+        }
+
+        const data = dashboardRes.data.data || dashboardRes.data;
 
         setStats({
-          totalBookings: data.total_bookings,
-          activePitches: data.active_fields,
-          totalRevenue: data.total_revenue,
-          todayBookings: data.today_bookings,
-          todayRevenue: data.today_revenue,
-          pendingBookings: data.pending_bookings,
-          growth: 18.2 // Can be calculated if needed
+          totalBookings: data.total_bookings || 0,
+          activePitches: data.total_fields || data.active_fields || 0,
+          totalRevenue: data.total_revenue || 0,
+          todayBookings: data.today_bookings || 0,
+          todayRevenue: data.today_revenue || 0,
+          pendingBookings: data.pending_bookings || 0,
+          growth: role === 'admin' ? 12.5 : 8.4 // Giả lập tỷ lệ tăng trưởng
         });
 
-        // Map backend monthly revenue to chart data
+        // Ánh xạ dữ liệu biểu đồ
         if (data.monthly_revenue) {
           const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
           const chartData = data.monthly_revenue.map(item => ({
-            name: months[item.month - 1],
+            name: months[item.month - 1] || `Tháng ${item.month}`,
             revenue: item.revenue
           }));
           setRevenueData(chartData);
         }
 
-        // Map real bookings to recent bookings
-        if (bookingsRes.data.data) {
-          const recent = bookingsRes.data.data.slice(0, 5).map(b => ({
+        // Ánh xạ danh sách đặt sân gần đây
+        const bookingsData = bookingsRes.data.data || bookingsRes.data;
+        if (Array.isArray(bookingsData)) {
+          const recent = bookingsData.slice(0, 5).map(b => ({
             id: b._id,
-            customer: b.user?.name || 'Unknown',
-            pitch: b.field?.name || 'N/A',
-            date: new Date(b.date).toLocaleDateString(),
+            customer: b.user_id?.full_name || b.user?.full_name || b.user?.name || 'Khách vãng lai',
+            pitch: b.field_id?.field_name || b.field?.field_name || 'Sân đã xóa',
+            date: new Date(b.booking_date || b.date).toLocaleDateString('vi-VN'),
             status: b.status.charAt(0).toUpperCase() + b.status.slice(1),
-            amount: b.totalPrice
+            amount: b.total_price || b.totalPrice || 0
           }));
           setRecentBookings(recent);
         }
@@ -77,7 +88,7 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
-  }, []);
+  }, [role]);
 
   const statCards = [
     {

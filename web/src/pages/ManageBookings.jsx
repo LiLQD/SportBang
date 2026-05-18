@@ -62,10 +62,14 @@ const ManageBookings = () => {
   };
 
   const filteredBookings = bookings.filter(booking => {
+    const customerName = booking.user?.full_name || booking.user?.name || '';
+    const pitchName = booking.field?.name || booking.field_id?.field_name || '';
+    const bookingId = booking._id || '';
+
     const matchesSearch =
-      booking.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.field?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking._id.toLowerCase().includes(searchTerm.toLowerCase());
+      customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pitchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bookingId.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || booking.status === filterStatus;
 
@@ -77,8 +81,12 @@ const ManageBookings = () => {
       <Sidebar />
       <div className="flex-grow p-8 text-black overflow-hidden flex flex-col">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-indigo-900">Manage Bookings</h1>
-          <p className="text-gray-500">View and manage court reservations</p>
+          <h1 className="text-3xl font-bold text-indigo-900">
+            {role === 'admin' ? 'System Bookings Control' : 'My Pitch Reservations'}
+          </h1>
+          <p className="text-gray-500">
+            {role === 'admin' ? 'Monitoring all transactions across the platform' : 'Manage your upcoming and past bookings'}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col flex-grow">
@@ -160,10 +168,10 @@ const ManageBookings = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold mr-3">
-                            {booking.user?.name?.charAt(0) || 'U'}
+                            {(booking.user?.full_name || booking.user?.name || 'U').charAt(0)}
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-800">{booking.user?.name}</div>
+                            <div className="font-semibold text-gray-800">{booking.user?.full_name || booking.user?.name}</div>
                             <div className="text-xs text-gray-500">{booking.user?.phone}</div>
                           </div>
                         </div>
@@ -171,17 +179,17 @@ const ManageBookings = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center text-gray-700">
                           <MapPin size={14} className="mr-1 text-gray-400" />
-                          <span className="font-medium">{booking.field?.name}</span>
+                          <span className="font-medium">{booking.field?.name || booking.field_id?.field_name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium">{new Date(booking.date).toLocaleDateString()}</div>
+                        <div className="text-sm font-medium">{new Date(booking.date || booking.booking_date).toLocaleDateString()}</div>
                         <div className="text-xs text-indigo-600 bg-indigo-50 inline-block px-1 rounded mt-1">
-                          {booking.startTime} - {booking.endTime}
+                          {booking.startTime || booking.start_time} - {booking.endTime || booking.end_time}
                         </div>
                       </td>
                       <td className="px-6 py-4 font-bold text-gray-900">
-                        ${booking.totalPrice}
+                        ${booking.totalPrice || booking.total_price}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusStyle(booking.status)}`}>

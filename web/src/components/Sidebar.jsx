@@ -30,10 +30,8 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const menuItems = [
+  const commonItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
-    { name: 'Manage Pitches', path: '/pitches', icon: <MapPin size={20} /> },
-    { name: 'Bookings', path: '/bookings', icon: <Calendar size={20} /> },
     {
       name: 'Notifications',
       path: '/notifications',
@@ -50,9 +48,20 @@ const Sidebar = () => {
     },
   ];
 
-  if (role === 'admin') {
-    menuItems.push({ name: 'User Management', path: '/users', icon: <UsersIcon size={20} /> });
-  }
+  const adminItems = [
+    { name: 'User Management', path: '/users', icon: <UsersIcon size={20} /> },
+    { name: 'System Pitches', path: '/pitches', icon: <MapPin size={20} /> },
+    { name: 'All Bookings', path: '/bookings', icon: <Calendar size={20} /> },
+  ];
+
+  const ownerItems = [
+    { name: 'My Pitches', path: '/pitches', icon: <MapPin size={20} /> },
+    { name: 'Pitch Reservations', path: '/bookings', icon: <Calendar size={20} /> },
+  ];
+
+  const menuItems = role === 'admin'
+    ? [commonItems[0], ...adminItems, commonItems[1]]
+    : [commonItems[0], ...ownerItems, commonItems[1]];
 
   const isActive = (path) => location.pathname === path;
 

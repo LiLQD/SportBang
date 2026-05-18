@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, MapPin, Loader2, AlertCircle } from 'lucide-react';
-import { fieldService } from '../services/api';
+import { Plus, Edit, Trash2, MapPin, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { fieldService, adminService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import PitchModal from '../components/PitchModal';
 
 const ManagePitches = () => {
+  const role = localStorage.getItem('role');
   const [pitches, setPitches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,12 +17,17 @@ const ManagePitches = () => {
 
   useEffect(() => {
     fetchPitches();
-  }, []);
+  }, [role]);
 
   const fetchPitches = async () => {
     try {
       setLoading(true);
-      const response = await fieldService.getMyFields();
+      let response;
+      if (role === 'admin') {
+        response = await fieldService.getAllFields();
+      } else {
+        response = await fieldService.getMyFields();
+      }
       setPitches(response.data.data || []);
       setError(null);
     } catch (err) {
@@ -66,6 +72,19 @@ const ManagePitches = () => {
     }
   };
 
+  const handleToggleStatus = async (pitchId, currentStatus) => {
+    try {
+      setActionLoading(true);
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      await adminService.updateFieldStatus(pitchId, newStatus);
+      setPitches(prev => prev.map(p => p._id === pitchId ? { ...p, status: newStatus } : p));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update pitch status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this pitch?')) {
       try {
@@ -83,13 +102,17 @@ const ManagePitches = () => {
 
       <div className="flex-grow p-8 text-black overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-indigo-900">Manage Pitches</h1>
-          <button
-            onClick={handleOpenAddModal}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-indigo-700 transition shadow-sm"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Add New Pitch
-          </button>
+          <h1 className="text-3xl font-bold text-indigo-900">
+            {role === 'admin' ? 'System Management: Pitches' : 'Manage My Pitches'}
+          </h1>
+          {role === 'owner' && (
+            <button
+              onClick={handleOpenAddModal}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-indigo-700 transition shadow-sm"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add New Pitch
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -141,6 +164,19 @@ const ManagePitches = () => {
                   <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                     <span className="font-bold text-indigo-600 text-lg">${pitch.price}<span className="text-xs text-gray-400 font-normal">/hr</span></span>
                     <div className="flex space-x-1">
+                      {role === 'admin' && (
+                        <button
+                          onClick={() => handleToggleStatus(pitch._id, pitch.status || 'active')}
+                          className={`p-2 rounded-full transition ${
+                            (pitch.status === 'active' || !pitch.status)
+                              ? 'text-yellow-500 hover:bg-yellow-50'
+                              : 'text-green-500 hover:bg-green-50'
+                          }`}
+                          title={(pitch.status === 'active' || !pitch.status) ? 'Deactivate' : 'Activate'}
+                        >
+                          {(pitch.status === 'active' || !pitch.status) ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenEditModal(pitch)}
                         className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition"
