@@ -14,6 +14,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/auth.store";
 import { getImageUrl } from "@/src/utils/helpers";
 import { getShadow } from "@/src/utils/style";
+import { ownerService } from "@/src/services/owner.service";
 
 export default function FieldsList() {
   const { darkMode } = useAuthStore();
@@ -25,12 +26,19 @@ export default function FieldsList() {
   const fetchFields = async (isRefreshing = false) => {
     try {
       if (!isRefreshing) setLoading(true);
+      console.log("[FieldsList] Đang tải danh sách sân của chủ sân...");
       const res = await ownerService.getFields();
-      if (res.success) {
+
+      if (res && res.data) {
+        console.log("[FieldsList] Đã tải thành công", res.data.length, "sân");
         setFields(res.data);
+      } else {
+        console.log("[FieldsList] Không tìm thấy dữ liệu sân");
+        setFields([]);
       }
     } catch (error) {
-      console.error("Error fetching fields:", error);
+      console.error("[FieldsList] Lỗi fetchFields:", error);
+      setFields([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
