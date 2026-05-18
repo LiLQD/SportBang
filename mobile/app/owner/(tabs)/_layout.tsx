@@ -67,10 +67,7 @@ export default function OwnerTabsLayout() {
       <Tabs.Screen
         name="revenue"
         options={{
-          title: "Doanh thu",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart-outline" size={size} color={color} />
-          ),
+          href: null, // Ẩn tab doanh thu
         }}
       />
       <Tabs.Screen
