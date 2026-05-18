@@ -18,6 +18,11 @@ import { fieldService } from "@/src/services/field.service";
 import { getShadow } from "@/src/utils/style";
 
 const SPORT_TYPES = ["Bóng đá", "Cầu lông", "Tennis", "Bóng rổ", "Bóng chuyền", "Khác"];
+const FIELD_STATUSES = [
+  { label: "Đang hoạt động", value: "active", color: "#22C55E" },
+  { label: "Đang bảo trì", value: "maintenance", color: "#F59E0B" },
+  { label: "Tạm ngưng", value: "inactive", color: "#64748B" },
+];
 
 export default function EditFieldScreen() {
   const { id } = useLocalSearchParams();
@@ -221,6 +226,34 @@ export default function EditFieldScreen() {
           </View>
         </View>
 
+        <View style={[styles.card, darkMode && styles.cardDark, { marginTop: 15 }]}>
+          <Text style={styles.sectionTitle}>Trạng thái sân</Text>
+          <View style={styles.statusContainer}>
+            {FIELD_STATUSES.map((status) => (
+              <TouchableOpacity
+                key={status.value}
+                onPress={() => setForm({ ...form, status: status.value })}
+                style={[
+                  styles.statusOption,
+                  form.status === status.value && { borderColor: status.color, backgroundColor: status.color + '10' }
+                ]}
+              >
+                <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                <Text style={[
+                  styles.statusOptionLabel,
+                  darkMode && { color: "#D1D5DB" },
+                  form.status === status.value && { color: status.color, fontWeight: 'bold' }
+                ]}>
+                  {status.label}
+                </Text>
+                {form.status === status.value && (
+                  <Ionicons name="checkmark-circle" size={20} color={status.color} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={[styles.saveBtn, loading && { opacity: 0.7 }]}
@@ -263,6 +296,19 @@ const styles = StyleSheet.create({
   buttonGroup: { padding: 20, marginTop: 10 },
   saveBtn: { backgroundColor: "#22C55E", height: 50, borderRadius: 12, justifyContent: "center", alignItems: "center", ...getShadow(0.1, 5, 2) },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  statusContainer: { paddingVertical: 10 },
+  statusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 10,
+    gap: 12
+  },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusOptionLabel: { flex: 1, fontSize: 15, color: '#475569' },
   deleteLink: { marginTop: 20, alignItems: "center" },
   deleteLinkText: { color: "#EF4444", fontSize: 14, fontWeight: "600" }
 });

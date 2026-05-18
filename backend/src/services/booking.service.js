@@ -1,6 +1,6 @@
 const Booking = require('../models/Booking');
 const Field = require('../models/Field');
-const Notification = require('../models/Notification');
+const notificationService = require('./notification.service');
 const Payment = require('../models/Payment');
 
 const timeToMinutes = (time) => {
@@ -96,13 +96,22 @@ const createBooking = async (user, payload) => {
   });
 
   // Create notification for user
-  await Notification.create({
-    user_id: user._id,
-    title: 'Booking Confirmed!',
-    message: `Your booking at ${field.field_name} for ${booking_slot.start} - ${booking_slot.end} on ${new Date(booking_date).toLocaleDateString()} has been confirmed.`,
-    type: 'booking',
-    data: { booking_id: booking._id }
-  });
+  await notificationService.createNotification(
+    user._id,
+    'Đặt sân thành công',
+    `Đơn đặt sân của bạn tại ${field.field_name} vào lúc ${booking_slot.start} - ${booking_slot.end} ngày ${new Date(booking_date).toLocaleDateString('vi-VN')} đã được tạo thành công. Vui lòng thanh toán để hoàn tất.`,
+    'booking',
+    { booking_id: booking._id }
+  );
+
+  // Create notification for owner
+  await notificationService.createNotification(
+    field.owner_id,
+    'Có đơn đặt sân mới',
+    `Sân ${field.field_name} vừa có đơn đặt mới vào lúc ${booking_slot.start} - ${booking_slot.end} ngày ${new Date(booking_date).toLocaleDateString('vi-VN')}.`,
+    'booking',
+    { booking_id: booking._id }
+  );
 
   return {
     ...booking.toObject(),
@@ -177,13 +186,13 @@ const cancelBooking = async (id, user) => {
   const savedBooking = await booking.save();
 
   // Create notification for user
-  await Notification.create({
-    user_id: user._id,
-    title: 'Booking Cancelled',
-    message: `You have successfully cancelled your booking at ${bookingDateTime.toLocaleDateString()}.`,
-    type: 'booking',
-    data: { booking_id: booking._id }
-  });
+  await notificationService.createNotification(
+    user._id,
+    'Hủy đơn đặt sân',
+    `Bạn đã hủy thành công đơn đặt sân vào ngày ${bookingDateTime.toLocaleDateString('vi-VN')}.`,
+    'booking',
+    { booking_id: booking._id }
+  );
 
   return savedBooking;
 };
@@ -221,13 +230,13 @@ const updateBookingStatus = async (id, status, user) => {
   }
 
   // Create notification for customer
-  await Notification.create({
-    user_id: booking.user_id,
-    title: 'Trạng thái đơn đặt sân đã cập nhật',
-    message: `Đơn đặt sân của bạn đã được chuyển sang trạng thái: ${status === 'confirmed' ? 'Đã duyệt' : status}`,
-    type: 'booking',
-    data: { booking_id: booking._id }
-  });
+  await notificationService.createNotification(
+    booking.user_id,
+    'Trạng thái đơn đặt sân đã cập nhật',
+    `Đơn đặt sân của bạn đã được chuyển sang trạng thái: ${status === 'confirmed' ? 'Đã duyệt' : (status === 'completed' ? 'Hoàn thành' : (status === 'cancelled' ? 'Đã hủy' : status))}`,
+    'booking',
+    { booking_id: booking._id }
+  );
 
   return savedBooking;
 };

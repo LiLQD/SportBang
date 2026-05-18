@@ -56,6 +56,26 @@ export default function FieldsList() {
     }, [])
   );
 
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return '#22C55E';
+      case 'maintenance': return '#F59E0B';
+      case 'inactive': return '#64748B';
+      case 'deleted': return '#EF4444';
+      default: return '#22C55E';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return 'Đang hoạt động';
+      case 'maintenance': return 'Đang bảo trì';
+      case 'inactive': return 'Tạm ngưng';
+      case 'deleted': return 'Đã xóa';
+      default: return 'Hoạt động';
+    }
+  };
+
   const renderFieldItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[styles.fieldCard, darkMode && { backgroundColor: "#1F2937" }]}
@@ -70,7 +90,7 @@ export default function FieldsList() {
         }}
         style={styles.fieldImage}
       />
-      <View style={styles.fieldInfo}>
+      <div style={styles.fieldInfo}>
         <View style={styles.fieldHeader}>
           <Text style={[styles.fieldName, darkMode && { color: "#fff" }]} numberOfLines={1}>
             {item.field_name}
@@ -83,17 +103,24 @@ export default function FieldsList() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sportBadge}>
-          <Text style={styles.sportText}>{item.sport_type || "Thể thao"}</Text>
+        <View style={styles.statusBadgeRow}>
+          <View style={styles.sportBadge}>
+            <Text style={styles.sportText}>{item.sport_type || "Thể thao"}</Text>
+          </View>
+          <View style={[styles.statusTextBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+            <Text style={[styles.statusTextLabel, { color: getStatusColor(item.status) }]}>
+              {getStatusText(item.status)}
+            </Text>
+          </View>
         </View>
 
         <Text style={styles.fieldType} numberOfLines={1}>{item.field_type}</Text>
 
         <View style={styles.fieldFooter}>
           <Text style={styles.fieldPrice}>{item.price_per_hour?.toLocaleString()}đ/h</Text>
-          <View style={[styles.statusDot, { backgroundColor: item.status === 'active' ? '#22C55E' : '#EF4444' }]} />
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
         </View>
-      </View>
+      </div>
     </TouchableOpacity>
   );
 
@@ -143,8 +170,11 @@ const styles = StyleSheet.create({
   fieldHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fieldName: { fontSize: 16, fontWeight: '700', color: '#1E293B', flex: 1 },
   editBtn: { padding: 2 },
-  sportBadge: { alignSelf: 'flex-start', backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 },
+  statusBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  sportBadge: { alignSelf: 'flex-start', backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   sportText: { fontSize: 11, fontWeight: '600', color: '#16A34A' },
+  statusTextBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  statusTextLabel: { fontSize: 10, fontWeight: 'bold' },
   fieldType: { fontSize: 13, color: '#64748B', marginTop: 4 },
   fieldFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   fieldPrice: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },

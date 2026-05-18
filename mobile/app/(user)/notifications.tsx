@@ -37,18 +37,42 @@ export default function NotificationScreen() {
     }
   };
 
-  const renderNotification = ({ item }: { item: any }) => (
-    <View style={[styles.card, !item.is_read && styles.unread]}>
-      <View style={styles.iconContainer}>
-        <Ionicons name="notifications-outline" size={24} color="#22C55E" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.time}>{new Date(item.createdAt).toLocaleTimeString()}</Text>
-      </View>
-    </View>
-  );
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'booking': return { name: 'calendar', color: '#3B82F6', bg: '#DBEAFE' };
+      case 'payment': return { name: 'card', color: '#22C55E', bg: '#DCFCE7' };
+      case 'system': return { name: 'alert-circle', color: '#F59E0B', bg: '#FEF3C7' };
+      default: return { name: 'notifications', color: '#22C55E', bg: '#DCFCE7' };
+    }
+  };
+
+  const renderNotification = ({ item }: { item: any }) => {
+    const icon = getIcon(item.type);
+    return (
+      <TouchableOpacity
+        style={[styles.card, !item.is_read && styles.unread]}
+        onPress={() => {
+          if (!item.is_read) {
+            notificationService.markAsRead(item._id);
+            // Cập nhật local state để UI thay đổi ngay lập tức
+            setNotifications(notifications.map(n => n._id === item._id ? {...n, is_read: true} : n));
+          }
+        }}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: icon.bg }]}>
+          <Ionicons name={icon.name as any} size={24} color={icon.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={styles.message}>{item.message}</Text>
+          <Text style={styles.time}>
+            {new Date(item.createdAt).toLocaleDateString('vi-VN')} {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+        {!item.is_read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#22C55E" /></View>;
 
@@ -75,5 +99,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontWeight: '700', fontSize: 16, marginBottom: 4 },
   message: { color: '#6B7280', fontSize: 14, marginBottom: 4 },
   time: { color: '#9CA3AF', fontSize: 12 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E', alignSelf: 'center', marginLeft: 8 },
   empty: { textAlign: 'center', marginTop: 100, color: '#9CA3AF' }
 });

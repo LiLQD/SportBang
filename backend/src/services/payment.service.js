@@ -1,6 +1,7 @@
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const Field = require('../models/Field');
+const notificationService = require('./notification.service');
 
 const createPayment = async (user, payload) => {
   const { booking_id, payment_method } = payload;
@@ -103,6 +104,18 @@ const updatePaymentStatus = async (user, paymentId, status) => {
 
   payment.payment_status = status;
   await payment.save();
+
+  // Thông báo cho khách hàng về trạng thái thanh toán
+  const statusVN = status === 'paid' ? 'thành công' : (status === 'failed' ? 'thất bại' : (status === 'refunded' ? 'đã được hoàn tiền' : status));
+  await notificationService.createNotification(
+    booking.user_id,
+    'Cập nhật thanh toán',
+    `Giao dịch cho đơn đặt sân tại ${field?.field_name || 'sân'} đã được xác nhận ${statusVN}.`,
+    'payment',
+    { payment_id: payment._id, booking_id: booking._id }
+  );
+
+  // Nếu là chủ sân xác nhận thanh toán tiền mặt thành công, thông báo cho chủ sân luôn (optional)
 
   // Hoàn tiền/Hủy
   if (status === 'refunded' && booking) {

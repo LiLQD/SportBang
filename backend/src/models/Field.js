@@ -50,7 +50,7 @@ const fieldSchema = new mongoose.Schema({
   ],
   status: {
     type: String,
-    enum: ['active', 'maintenance', 'inactive'],
+    enum: ['active', 'maintenance', 'inactive', 'deleted'],
     default: 'active'
   },
   users_rate: {
