@@ -119,7 +119,7 @@ const updateField = async (fieldId, payload, user) => {
     validateSlots(payload.available_time);
   }
   
-  return await Field.findByIdAndUpdate(fieldId, payload, { new: true });
+  return await Field.findByIdAndUpdate(fieldId, payload, { returnDocument: 'after' });
 };
 
 const updateFieldStatus = async (fieldId, status, user) => {

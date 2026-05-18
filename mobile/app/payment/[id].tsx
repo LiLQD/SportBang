@@ -7,6 +7,8 @@ import {
   Alert,
   Platform,
   ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,7 +18,6 @@ import { paymentService } from "@/src/services/payment.service";
 import { getShadow } from "@/src/utils/style";
 
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
 
 export default function PaymentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +26,13 @@ export default function PaymentDetailScreen() {
   const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // Card states
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
 
   useEffect(() => {
     fetchPaymentDetail();
@@ -45,39 +53,57 @@ export default function PaymentDetailScreen() {
     }
   };
 
-  const handlePayment = async (method: string) => {
+  const handleCashPayment = async () => {
     try {
       setProcessing(true);
-      const methodKey = method.toLowerCase();
+      await paymentService.updatePaymentStatus(id as string, 'pending');
+      const msg = "Đã ghi nhận yêu cầu thanh toán tại sân. Vui lòng thanh toán khi đến nhận sân!";
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert("Thành công", msg);
+      router.replace("/(user)/payments");
+    } catch (error: any) {
+      const errorMsg = error.message || "Không thể cập nhật phương thức thanh toán.";
+      if (Platform.OS === 'web') window.alert(errorMsg);
+      else Alert.alert("Lỗi", errorMsg);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
-      if (method === 'Tiền mặt') {
-        await paymentService.updatePaymentStatus(id as string, 'pending');
-        const msg = "Đã ghi nhận yêu cầu thanh toán tại sân. Vui lòng thanh toán khi đến nhận sân!";
+  const handleCardPayment = async () => {
+    // Basic validation
+    if (!cardHolder || cardHolder.length < 3) {
+      Alert.alert("Lỗi", "Vui lòng nhập tên chủ thẻ hợp lệ");
+      return;
+    }
+    if (cardNumber.length < 16) {
+      Alert.alert("Lỗi", "Số thẻ phải đủ 16 chữ số");
+      return;
+    }
+    if (!expiry.includes('/') || expiry.length < 5) {
+      Alert.alert("Lỗi", "Định dạng ngày hết hạn không đúng (MM/YY)");
+      return;
+    }
+    if (cvv.length < 3) {
+      Alert.alert("Lỗi", "Mã CVV không hợp lệ");
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      // Giả lập xử lý thanh toán và cập nhật trạng thái trực tiếp
+      // Vì là môi trường học tập/demo, ta gọi thẳng API update trạng thái sang 'paid'
+      const res = await paymentService.updatePaymentStatus(id as string, 'paid');
+
+      if (res && res.success) {
+        const msg = "Thanh toán thành công! Đơn đặt sân của bạn đã được xác nhận.";
         if (Platform.OS === 'web') window.alert(msg);
         else Alert.alert("Thành công", msg);
+
         router.replace("/(user)/payments");
-        return;
-      }
-
-      // Gọi API để cập nhật phương thức và lấy URL thanh toán mô phỏng
-      const res = await paymentService.createPayment({
-        booking_id: payment.booking_id._id,
-        payment_method: methodKey
-      });
-
-      if (res.success && res.data.payment_url) {
-        const paymentUrl = res.data.payment_url;
-
-        if (Platform.OS === 'web') {
-          window.open(paymentUrl, '_blank');
-        } else {
-          await WebBrowser.openBrowserAsync(paymentUrl);
-        }
-
-        // Refresh lại dữ liệu sau khi người dùng quay lại từ trình duyệt
-        setTimeout(() => fetchPaymentDetail(), 2000);
       } else {
-        throw new Error(res.message || "Không thể khởi tạo thanh toán");
+        throw new Error(res?.message || "Không thể cập nhật trạng thái thanh toán");
       }
 
     } catch (error: any) {
@@ -106,80 +132,156 @@ export default function PaymentDetailScreen() {
   }
 
   return (
-    <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
-      {/* HEADER */}
-      <View style={[styles.header, darkMode && { borderBottomColor: "#1F2937" }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={darkMode ? "#fff" : "#111827"} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, darkMode && { color: "#fff" }]}>Thanh toán</Text>
-        <View style={{ width: 40 }} />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
+      <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
+        {/* HEADER */}
+        <View style={[styles.header, darkMode && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={darkMode ? "#fff" : "#111827"} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, darkMode && { color: "#fff" }]}>Thanh toán</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          {/* SUMMARY CARD */}
+          <View style={[styles.summaryCard, darkMode && { backgroundColor: "#1F2937" }]}>
+            <Text style={[styles.summaryLabel, darkMode && { color: "#9CA3AF" }]}>Số tiền cần thanh toán</Text>
+            <Text style={styles.amountText}>{payment.amount?.toLocaleString('vi-VN')}đ</Text>
+
+            <View style={[styles.divider, darkMode && { backgroundColor: "#374151" }]} />
+
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Sân:</Text>
+              <Text style={[styles.infoValue, darkMode && { color: "#fff" }]}>{payment.booking_id?.field_id?.field_name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Mã đặt sân:</Text>
+              <Text style={[styles.infoValue, darkMode && { color: "#fff" }]}>#{payment.booking_id?._id.slice(-8).toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Phương thức thanh toán</Text>
+
+          {/* Cash Option */}
+          <TouchableOpacity
+            style={[
+              styles.methodBtn,
+              darkMode && { backgroundColor: "#1F2937" },
+              !showCardForm && styles.selectedMethod
+            ]}
+            onPress={() => {
+              setShowCardForm(false);
+              handleCashPayment();
+            }}
+            disabled={processing}
+          >
+            <View style={[styles.methodIcon, { backgroundColor: "#22C55E" }]}>
+              <Ionicons name="cash" size={20} color="#fff" />
+            </View>
+            <Text style={[styles.methodText, darkMode && { color: "#fff" }]}>Thanh toán tại sân (Tiền mặt)</Text>
+            {!showCardForm && <Ionicons name="checkmark-circle" size={24} color="#22C55E" />}
+          </TouchableOpacity>
+
+          {/* Card Option Toggle */}
+          <TouchableOpacity
+            style={[
+              styles.methodBtn,
+              darkMode && { backgroundColor: "#1F2937" },
+              showCardForm && styles.selectedMethod
+            ]}
+            onPress={() => setShowCardForm(!showCardForm)}
+            disabled={processing}
+          >
+            <View style={[styles.methodIcon, { backgroundColor: "#3B82F6" }]}>
+              <Ionicons name="card" size={20} color="#fff" />
+            </View>
+            <Text style={[styles.methodText, darkMode && { color: "#fff" }]}>Thanh toán bằng Thẻ (Visa/Mastercard)</Text>
+            <Ionicons name={showCardForm ? "chevron-up" : "chevron-down"} size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          {/* Card Form */}
+          {showCardForm && (
+            <View style={[styles.cardForm, darkMode && { backgroundColor: "#1F2937" }]}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Tên chủ thẻ</Text>
+                <TextInput
+                  style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                  placeholder="NGUYEN VAN A"
+                  placeholderTextColor="#64748B"
+                  value={cardHolder}
+                  onChangeText={setCardHolder}
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Số thẻ</Text>
+                <TextInput
+                  style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                  placeholder="0000 0000 0000 0000"
+                  placeholderTextColor="#64748B"
+                  keyboardType="numeric"
+                  value={cardNumber}
+                  onChangeText={setCardNumber}
+                  maxLength={16}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+                  <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Hết hạn (MM/YY)</Text>
+                  <TextInput
+                    style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                    placeholder="12/25"
+                    placeholderTextColor="#64748B"
+                    keyboardType="numeric"
+                    value={expiry}
+                    onChangeText={setExpiry}
+                    maxLength={5}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
+                  <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>CVV</Text>
+                  <TextInput
+                    style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                    placeholder="123"
+                    placeholderTextColor="#64748B"
+                    keyboardType="numeric"
+                    secureTextEntry
+                    value={cvv}
+                    onChangeText={setCvv}
+                    maxLength={3}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.payNowBtn}
+                onPress={handleCardPayment}
+                disabled={processing}
+              >
+                {processing ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.payNowText}>Thanh toán ngay</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+
+        {processing && !showCardForm && (
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color="#22C55E" />
+            <Text style={styles.overlayText}>Đang xử lý giao dịch...</Text>
+          </View>
+        )}
       </View>
-
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        {/* SUMMARY CARD */}
-        <View style={[styles.summaryCard, darkMode && { backgroundColor: "#1F2937" }]}>
-          <Text style={[styles.summaryLabel, darkMode && { color: "#9CA3AF" }]}>Số tiền cần thanh toán</Text>
-          <Text style={styles.amountText}>{payment.amount?.toLocaleString('vi-VN')}đ</Text>
-
-          <View style={[styles.divider, darkMode && { backgroundColor: "#374151" }]} />
-
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Sân:</Text>
-            <Text style={[styles.infoValue, darkMode && { color: "#fff" }]}>{payment.booking_id?.field_id?.field_name}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, darkMode && { color: "#9CA3AF" }]}>Mã đặt sân:</Text>
-            <Text style={[styles.infoValue, darkMode && { color: "#fff" }]}>#{payment.booking_id?._id.slice(-8).toUpperCase()}</Text>
-          </View>
-        </View>
-
-        <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>Chọn phương thức thanh toán</Text>
-
-        <TouchableOpacity
-          style={[styles.methodBtn, darkMode && { backgroundColor: "#1F2937" }]}
-          onPress={() => handlePayment("MoMo")}
-          disabled={processing}
-        >
-          <View style={[styles.methodIcon, { backgroundColor: "#A50064" }]}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>M</Text>
-          </View>
-          <Text style={[styles.methodText, darkMode && { color: "#fff" }]}>Ví MoMo</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.methodBtn, darkMode && { backgroundColor: "#1F2937" }]}
-          onPress={() => handlePayment("Banking")}
-          disabled={processing}
-        >
-          <View style={[styles.methodIcon, { backgroundColor: "#3B82F6" }]}>
-            <Ionicons name="card" size={20} color="#fff" />
-          </View>
-          <Text style={[styles.methodText, darkMode && { color: "#fff" }]}>Thẻ ngân hàng / Banking</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.methodBtn, darkMode && { backgroundColor: "#1F2937" }]}
-          onPress={() => handlePayment("Tiền mặt")}
-          disabled={processing}
-        >
-          <View style={[styles.methodIcon, { backgroundColor: "#22C55E" }]}>
-            <Ionicons name="cash" size={20} color="#fff" />
-          </View>
-          <Text style={[styles.methodText, darkMode && { color: "#fff" }]}>Thanh toán tại sân (Tiền mặt)</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-      </ScrollView>
-
-      {processing && (
-        <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#22C55E" />
-          <Text style={styles.overlayText}>Đang xử lý giao dịch...</Text>
-        </View>
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -222,6 +324,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
     ...getShadow(0.05, 5, 2),
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedMethod: {
+    borderColor: '#22C55E',
   },
   methodIcon: {
     width: 40,
@@ -232,6 +339,35 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   methodText: { flex: 1, fontSize: 16, fontWeight: '600', color: '#1E293B' },
+
+  // Card Form Styles
+  cardForm: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 30,
+    ...getShadow(0.05, 5, 2),
+  },
+  inputGroup: { marginBottom: 16 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#64748B', marginBottom: 8 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  row: { flexDirection: 'row' },
+  payNowBtn: {
+    backgroundColor: '#22C55E',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  payNowText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -241,3 +377,4 @@ const styles = StyleSheet.create({
   },
   overlayText: { color: '#fff', marginTop: 15, fontSize: 16, fontWeight: '600' },
 });
+

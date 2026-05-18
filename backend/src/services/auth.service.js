@@ -114,7 +114,7 @@ const updateProfile = async (userId, payload) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { full_name, phone },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 
   if (!user) {
