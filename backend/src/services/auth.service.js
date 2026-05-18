@@ -6,11 +6,21 @@ const { generateToken, generateRefreshToken } = require('../utils/jwt');
 const register = async (payload) => {
   const { full_name, email, phone, password, role } = payload;
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    throw new Error('User already exists');
+  // 1. Kiểm tra xem email này đã tồn tại chưa
+  const existingUser = await User.findOne({ email });
+
+  if (existingUser) {
+    if (existingUser.isDeleted) {
+      // Nếu tài khoản đã bị xóa trước đó, ta xóa hẳn record cũ để cho phép đăng ký mới
+      await User.deleteOne({ _id: existingUser._id });
+      console.log(`[AUTH] Deleted old soft-deleted record for email: ${email}`);
+    } else {
+      // Nếu tài khoản đang hoạt động thì báo lỗi
+      throw new Error('Email này đã được đăng ký sử dụng');
+    }
   }
 
+  // 2. Tạo tài khoản mới
   const user = await User.create({
     full_name,
     email,
@@ -26,14 +36,14 @@ const register = async (payload) => {
 };
 
 const login = async (email, password) => {
-  const user = await User.findOne({ email }).select('+password');
+  const user = await User.findOne({ email, isDeleted: { $ne: true } }).select('+password');
   
   if (!user) {
-    throw new Error('Invalid email or password');
+    throw new Error('Tài khoản không tồn tại hoặc đã bị xóa');
   }
 
   if (user.status !== 'active') {
-    throw new Error('Account is blocked');
+    throw new Error('Tài khoản của bạn đã bị khóa');
   }
 
   const isMatch = await user.comparePassword(password);

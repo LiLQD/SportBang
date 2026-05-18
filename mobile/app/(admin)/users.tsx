@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,42 +53,68 @@ export default function AdminUsers() {
     const action = user.status === 'blocked' ? 'bỏ chặn' : 'chặn';
 
     const performAction = async () => {
-        try {
-            await adminService.blockUser(user._id);
-            fetchUsers();
-        } catch (error: any) {
-            Alert.alert("Lỗi", error.message || "Thao tác thất bại");
+      try {
+        await adminService.blockUser(user._id);
+        fetchUsers();
+        if (Platform.OS === 'web') {
+          alert(`Đã ${action} thành công!`);
         }
+      } catch (error: any) {
+        if (Platform.OS === 'web') {
+          alert(error.message || "Thao tác thất bại");
+        } else {
+          Alert.alert("Lỗi", error.message || "Thao tác thất bại");
+        }
+      }
     };
 
-    Alert.alert(
-      "Xác nhận",
-      `Bạn có chắc chắn muốn ${action} người dùng ${user.full_name || 'này'}?`,
-      [
-        { text: "Hủy", style: "cancel" },
-        { text: "Xác nhận", onPress: performAction }
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Bạn có chắc chắn muốn ${action} người dùng ${user.full_name || 'này'}?`)) {
+        performAction();
+      }
+    } else {
+      Alert.alert(
+        "Xác nhận",
+        `Bạn có chắc chắn muốn ${action} người dùng ${user.full_name || 'này'}?`,
+        [
+          { text: "Hủy", style: "cancel" },
+          { text: "Xác nhận", onPress: performAction }
+        ]
+      );
+    }
   };
 
   const handleDeleteUser = (user: any) => {
     const performDelete = async () => {
-        try {
-            await adminService.deleteUser(user._id);
-            fetchUsers();
-        } catch (error: any) {
-            Alert.alert("Lỗi", error.message || "Xóa thất bại");
+      try {
+        await adminService.deleteUser(user._id);
+        fetchUsers();
+        if (Platform.OS === 'web') {
+          alert("Đã xóa người dùng thành công!");
         }
+      } catch (error: any) {
+        if (Platform.OS === 'web') {
+          alert(error.message || "Xóa thất bại");
+        } else {
+          Alert.alert("Lỗi", error.message || "Xóa thất bại");
+        }
+      }
     };
 
-    Alert.alert(
-      "Cảnh báo",
-      `Bạn có chắc chắn muốn xóa người dùng ${user.full_name || 'này'}? Hành động này không thể hoàn tác.`,
-      [
-        { text: "Hủy", style: "cancel" },
-        { text: "Xóa", style: "destructive", onPress: performDelete }
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng ${user.full_name || 'này'}? Hành động này không thể hoàn tác.`)) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Cảnh báo",
+        `Bạn có chắc chắn muốn xóa người dùng ${user.full_name || 'này'}? Hành động này không thể hoàn tác.`,
+        [
+          { text: "Hủy", style: "cancel" },
+          { text: "Xóa", style: "destructive", onPress: performDelete }
+        ]
+      );
+    }
   };
 
   // Lọc an toàn hơn, tránh lỗi nếu các trường bị null/undefined

@@ -72,9 +72,9 @@ const getDashboard = async () => {
 
 const getAllUsers = async () => {
   try {
-    // Tạm thời lấy tất cả user để debug
-    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
-    console.log(`[ADMIN SERVICE] Found ${users.length} users in database`);
+    // Chỉ lấy những người dùng chưa bị xóa
+    const users = await User.find({ isDeleted: { $ne: true } }).select('-password').sort({ createdAt: -1 });
+    console.log(`[ADMIN SERVICE] Found ${users.length} active users`);
     return users;
   } catch (error) {
     console.error("[ADMIN SERVICE] Error fetching users:", error);
@@ -93,11 +93,19 @@ const blockUser = async (userId) => {
 
 const softDeleteUser = async (userId) => {
   const user = await User.findById(userId);
-  if (!user) throw new Error('User not found');
-  if (user.role === 'admin') throw new Error('Cannot delete an admin');
+  if (!user) throw new Error('Không tìm thấy người dùng');
+  if (user.role === 'admin') throw new Error('Không thể xóa tài khoản Quản trị viên');
 
-  user.isDeleted = true;
-  return await user.save();
+  // Nếu là Owner, cần xử lý các sân bóng trước khi xóa người dùng
+  if (user.role === 'owner') {
+    // Cách 1: Xóa hẳn các sân bóng của owner này
+    await Field.deleteMany({ owner_id: userId });
+    // Cách 2: (An toàn hơn) Đánh dấu sân là đã xóa thay vì xóa cứng sân
+    // await Field.updateMany({ owner_id: userId }, { $set: { isDeleted: true } });
+  }
+
+  // Xóa hẳn người dùng khỏi MongoDB
+  return await User.findByIdAndDelete(userId);
 };
 
 const getAllFields = async () => {
