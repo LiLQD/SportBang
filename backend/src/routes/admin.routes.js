@@ -10,6 +10,7 @@ router.get('/dashboard', adminController.getDashboard);
 
 // User Management
 router.get('/users', adminController.getAllUsers);
+router.post('/users', adminController.createUser);
 router.patch('/users/:id/block', adminController.blockUser);
 router.delete('/users/:id', adminController.deleteUser);
 

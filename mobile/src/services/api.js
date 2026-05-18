@@ -30,6 +30,11 @@ export const apiCall = async (endpoint, options = {}) => {
     headers,
   };
 
+  // Tự động stringify body nếu là object và không phải FormData
+  if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+    config.body = JSON.stringify(config.body);
+  }
+
   try {
     console.log(`[API] Đang gọi: ${BASE_URL}${endpoint}`);
     const response = await fetch(`${BASE_URL}${endpoint}`, config);

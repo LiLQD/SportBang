@@ -35,4 +35,11 @@ export const adminService = {
       method: "DELETE",
     });
   },
+
+  createUser: async (userData) => {
+    return await apiCall("/admin/users", {
+      method: "POST",
+      body: userData,
+    });
+  },
 };

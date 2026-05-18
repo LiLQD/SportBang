@@ -9,6 +9,8 @@ import {
   Alert,
   RefreshControl,
   Platform,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +24,16 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Create User Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    role: "customer"
+  });
 
   const fetchUsers = async () => {
     try {
@@ -48,6 +60,29 @@ export default function AdminUsers() {
     setRefreshing(true);
     fetchUsers();
   }, []);
+
+  const handleCreateUser = async () => {
+    if (!newUser.full_name || !newUser.email || !newUser.phone || !newUser.password) {
+      Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await adminService.createUser(newUser);
+      if (res.success) {
+        if (Platform.OS === 'web') alert("Tạo người dùng thành công!");
+        else Alert.alert("Thành công", "Tạo người dùng thành công!");
+        setShowModal(false);
+        setNewUser({ full_name: "", email: "", phone: "", password: "", role: "customer" });
+        fetchUsers();
+      }
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.message || "Không thể tạo người dùng");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBlockUser = (user: any) => {
     const action = user.status === 'blocked' ? 'bỏ chặn' : 'chặn';
@@ -206,6 +241,102 @@ export default function AdminUsers() {
           )
         }
       />
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowModal(true)}
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Modal Thêm người dùng */}
+      <Modal visible={showModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, darkMode && { backgroundColor: "#1F2937" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, darkMode && { color: "#fff" }]}>Thêm người dùng mới</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <Ionicons name="close" size={24} color={darkMode ? "#fff" : "#000"} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.label, darkMode && { color: "#94A3B8" }]}>Họ và tên</Text>
+              <TextInput
+                style={[styles.input, darkMode && styles.darkInput]}
+                value={newUser.full_name}
+                onChangeText={(val) => setNewUser({ ...newUser, full_name: val })}
+                placeholder="Ví dụ: Nguyễn Văn A"
+                placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={[styles.label, darkMode && { color: "#94A3B8" }]}>Email</Text>
+              <TextInput
+                style={[styles.input, darkMode && styles.darkInput]}
+                value={newUser.email}
+                onChangeText={(val) => setNewUser({ ...newUser, email: val })}
+                placeholder="example@gmail.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={[styles.label, darkMode && { color: "#94A3B8" }]}>Số điện thoại</Text>
+              <TextInput
+                style={[styles.input, darkMode && styles.darkInput]}
+                value={newUser.phone}
+                onChangeText={(val) => setNewUser({ ...newUser, phone: val })}
+                placeholder="0912345678"
+                keyboardType="phone-pad"
+                placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={[styles.label, darkMode && { color: "#94A3B8" }]}>Mật khẩu ban đầu</Text>
+              <TextInput
+                style={[styles.input, darkMode && styles.darkInput]}
+                value={newUser.password}
+                onChangeText={(val) => setNewUser({ ...newUser, password: val })}
+                placeholder="Tối thiểu 6 ký tự"
+                secureTextEntry
+                placeholderTextColor="#94A3B8"
+              />
+
+              <Text style={[styles.label, darkMode && { color: "#94A3B8" }]}>Vai trò (Role)</Text>
+              <View style={styles.roleContainer}>
+                {['customer', 'owner', 'admin'].map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    style={[
+                      styles.roleOption,
+                      newUser.role === r && styles.roleActive,
+                      darkMode && newUser.role === r && { borderColor: '#10B981' }
+                    ]}
+                    onPress={() => setNewUser({ ...newUser, role: r })}
+                  >
+                    <Text style={[
+                      styles.roleText,
+                      newUser.role === r && styles.roleTextActive,
+                      darkMode && { color: newUser.role === r ? '#10B981' : '#94A3B8' }
+                    ]}>
+                      {r.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleCreateUser}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Xác nhận tạo</Text>}
+              </TouchableOpacity>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -253,5 +384,108 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   btnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  emptyText: { textAlign: 'center', marginTop: 10, color: '#94A3B8', fontSize: 16 }
+  emptyText: { textAlign: 'center', marginTop: 10, color: '#94A3B8', fontSize: 16 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#16a34a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...getShadow(0.3, 5, 5),
+    elevation: 5,
+    zIndex: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%',
+    padding: 24,
+    ...getShadow(0.2, 15, 10),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  modalForm: {
+    marginBottom: 0,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  darkInput: {
+    backgroundColor: '#374151',
+    color: '#fff',
+    borderColor: '#4B5563',
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  roleOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  roleActive: {
+    borderColor: '#16a34a',
+    backgroundColor: '#DCFCE7',
+  },
+  roleText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748B',
+  },
+  roleTextActive: {
+    color: '#166534',
+  },
+  submitBtn: {
+    backgroundColor: '#16a34a',
+    borderRadius: 14,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    ...getShadow(0.2, 8, 4),
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
