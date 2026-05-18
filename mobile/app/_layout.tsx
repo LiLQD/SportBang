@@ -30,11 +30,9 @@ export default function RootLayout() {
         router.replace("/(auth)/login");
       }
     } else if (inAuthGroup) {
-      // Nếu đã có token mà lỡ vào vùng auth -> Đẩy ra dashboard tương ứng
-      const role = user?.role || "customer";
-      if (role === "admin") router.replace("/(admin)/dashboard");
-      else if (role === "owner") router.replace("/owner/");
-      else router.replace("/(user)/");
+      // Nếu đã có token mà lỡ vào vùng auth -> Đẩy ra dashboard của user
+      // Vì Mobile app giờ chỉ dành cho Customer
+      router.replace("/(user)/");
     }
   }, [token, isHydrated, isMounted, segments]);
 
@@ -52,8 +50,6 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(user)" />
-        <Stack.Screen name="(admin)" />
-        <Stack.Screen name="owner" />
       </Stack>
     </PaperProvider>
   );

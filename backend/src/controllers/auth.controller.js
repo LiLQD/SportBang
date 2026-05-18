@@ -34,8 +34,38 @@ const getProfile = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const user = await authService.updateProfile(req.user._id, req.body);
+    return sendResponse(res, 200, true, 'Profile updated successfully', user);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const result = await authService.changePassword(req.user._id, req.body);
+    return sendResponse(res, 200, true, result.message);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    await authService.logout(req.user._id);
+    return sendResponse(res, 200, true, 'Logged out successfully');
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 module.exports = {
   register,
   login,
-  getProfile
+  logout,
+  getProfile,
+  updateProfile,
+  changePassword
 };

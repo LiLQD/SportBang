@@ -6,18 +6,20 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   Modal,
   TextInput,
-  Platform,
+  RefreshControl,
 } from "react-native";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { bookingService } from "@/src/services/booking.service";
+import { getImageUrl } from "@/src/utils/helpers";
 import { reviewService } from "@/src/services/review.service";
+import { bookingService } from "@/src/services/booking.service";
 import { getShadow } from "@/src/utils/style";
 import { useAuthStore } from "@/src/store/auth.store";
+import { Toast, ToastType } from "@/src/components/Toast";
+import { ConfirmationModal } from "@/src/components/ConfirmationModal";
 
 export default function BookingScreen() {
   const { darkMode } = useAuthStore();
@@ -28,12 +30,20 @@ export default function BookingScreen() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // UI States
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => { fetchBookings(); }, []);
 
   const fetchBookings = async () => {
     try {
-      setLoading(true);
       const res = await bookingService.getMyBookings();
       if (res && res.data) {
         setBookings(res.data);
@@ -45,21 +55,30 @@ export default function BookingScreen() {
       setBookings([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleCancelBooking = async (id: string) => {
-    Alert.alert("Xác nhận", "Bạn có chắc muốn hủy?", [
-      { text: "Không", style: "cancel" },
-      { text: "Có", onPress: async () => {
-          try {
-            await bookingService.cancelBooking(id);
-            fetchBookings();
-          } catch (error: any) {
-            Alert.alert("Lỗi", error.message);
-          }
-      }}
-    ]);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchBookings();
+  }, []);
+
+  const handleCancelBooking = async () => {
+    if (!cancelBookingId) return;
+
+    try {
+      setLoading(true);
+      await bookingService.cancelBooking(cancelBookingId);
+      showToast("Đã hủy đơn đặt sân thành công");
+      await fetchBookings();
+    } catch (error: any) {
+      console.error("[BookingScreen] Lỗi khi hủy:", error);
+      showToast(error.message || "Không thể hủy đơn đặt sân lúc này", "error");
+    } finally {
+      setLoading(false);
+      setCancelBookingId(null);
+    }
   };
 
   const submitReview = async () => {
@@ -72,10 +91,11 @@ export default function BookingScreen() {
         rating,
         comment,
       });
+      showToast("Gửi đánh giá thành công");
       setIsReviewModalVisible(false);
       fetchBookings();
     } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+      showToast(error.message || "Không thể gửi đánh giá", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +103,7 @@ export default function BookingScreen() {
 
   const renderBooking = ({ item }: { item: any }) => (
     <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
-      <Image source={{ uri: item.field_id?.images?.[0] }} style={styles.image} />
+      <Image source={{ uri: getImageUrl(item.field_id?.images?.[0]) }} style={styles.image} />
       <View style={styles.contentContainer}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.field_id?.field_name || "Sân bóng"}</Text>
@@ -93,10 +113,15 @@ export default function BookingScreen() {
             <Text style={[styles.badgeText, item.status === 'cancelled' && { color: '#EF4444' }, darkMode && item.status !== 'cancelled' && { color: '#60A5FA' }]}>{item.status.toUpperCase()}</Text>
           </View>
         </View>
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 8, justifyContent: 'center' }}>
           {(item.status === 'pending' || item.status === 'confirmed') && (
-            <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelBooking(item._id)}>
-              <Text style={styles.cancelText}>Hủy</Text>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setCancelBookingId(item._id)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <Text style={styles.cancelText}>Hủy sân</Text>
             </TouchableOpacity>
           )}
           {item.status === 'completed' && (
@@ -119,12 +144,40 @@ export default function BookingScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderBooking}
         ListEmptyComponent={<Text style={styles.emptyText}>Chưa có lịch đặt nào</Text>}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#22C55E"]}
+            tintColor={darkMode ? "#fff" : "#22C55E"}
+          />
+        }
       />
       <Modal visible={isReviewModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, darkMode && { backgroundColor: "#1F2937" }]}>
             <Text style={[styles.modalTitle, darkMode && { color: "#fff" }]}>Đánh giá sân</Text>
-            <TextInput style={[styles.reviewInput, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]} multiline value={comment} onChangeText={setComment} placeholder="Cảm nhận của bạn..." placeholderTextColor="#9CA3AF" />
+
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                  <Ionicons
+                    name={star <= rating ? "star" : "star-outline"}
+                    size={32}
+                    color={star <= rating ? "#F59E0B" : "#9CA3AF"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={[styles.reviewInput, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+              multiline
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Cảm nhận của bạn..."
+              placeholderTextColor="#9CA3AF"
+            />
             <TouchableOpacity style={styles.submitBtn} onPress={submitReview} disabled={isSubmitting}>
               {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={{color:'#fff', fontWeight: 'bold'}}>Gửi</Text>}
             </TouchableOpacity>
@@ -132,6 +185,27 @@ export default function BookingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* TOAST */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      <ConfirmationModal
+        visible={!!cancelBookingId}
+        title="Hủy đặt sân"
+        message="Bạn có chắc chắn muốn hủy đơn đặt sân này không?"
+        onConfirm={handleCancelBooking}
+        onCancel={() => setCancelBookingId(null)}
+        type="danger"
+        confirmText="Hủy sân"
+        darkMode={darkMode}
+      />
     </View>
   );
 }
@@ -155,6 +229,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center' },
   modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 15 },
+  starsContainer: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   reviewInput: { width: '100%', height: 100, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 10, marginBottom: 15 },
   submitBtn: { backgroundColor: '#22C55E', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' }
 });

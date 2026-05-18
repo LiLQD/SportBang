@@ -12,35 +12,79 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fieldService } from "@/src/services/field.service";
+import { favoriteService } from "@/src/services/favorite.service";
 import { useAuthStore } from "@/src/store/auth.store";
 import { getShadow } from "@/src/utils/style";
+import { getImageUrl } from "@/src/utils/helpers";
+import { useFocusEffect } from "expo-router";
 
 const categories = [
-  "Football",
-  "Badminton",
+  "Tất cả",
+  "Bóng đá",
+  "Cầu lông",
   "Tennis",
-  "Basketball",
+  "Bóng rổ",
+  "Bóng chuyền",
 ];
 
 export default function HomeScreen() {
   const { user, darkMode } = useAuthStore();
   const [fields, setFields] = useState([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchText, setSearchText] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Tất cả");
 
-  useEffect(() => {
-    // Chỉ fetch khi đã có user để đảm bảo token trong apiCall đã sẵn sàng
-    if (user) {
-      fetchFields();
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchFields();
+        fetchFavorites();
+      }
+    }, [user, activeCategory])
+  );
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await favoriteService.getFavorites();
+      if (res && res.data) {
+        setFavorites(res.data.map((f: any) => f._id));
+      }
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
     }
-  }, [user]);
+  };
 
-  const fetchFields = async () => {
+  const handleToggleFavorite = async (fieldId: string) => {
+    try {
+      await favoriteService.toggleFavorite(fieldId);
+      setFavorites((prev) =>
+        prev.includes(fieldId)
+          ? prev.filter((id) => id !== fieldId)
+          : [...prev, fieldId]
+      );
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
+
+  const fetchFields = async (searchOverride?: string) => {
     try {
       setLoading(true);
-      const res = await fieldService.getAllFields();
-      // Backend trả về { success: true, message: ..., data: [...] }
+      const filters: any = {};
+
+      if (activeCategory !== "Tất cả") {
+        filters.sport_type = activeCategory;
+      }
+
+      const searchVal = searchOverride !== undefined ? searchOverride : searchText;
+      if (searchVal) {
+        filters.search = searchVal;
+      }
+
+      const res = await fieldService.getAllFields(filters);
       if (res && res.data) {
         setFields(res.data);
       } else {
@@ -48,10 +92,18 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error("Error fetching fields:", error);
-      setFields([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchText(text);
+    // Bạn có thể thêm debounce ở đây, hoặc gọi trực tiếp nếu muốn tìm kiếm ngay
+  };
+
+  const submitSearch = () => {
+    fetchFields();
   };
 
   return (
@@ -63,11 +115,11 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={[styles.helloText, darkMode && { color: "#A7F3D0" }]}>
-                Hello,
+                Xin chào,
               </Text>
 
               <Text style={styles.userName}>
-                {user?.full_name || "User"}
+                {user?.full_name || "Người dùng"}
               </Text>
             </View>
 
@@ -92,94 +144,129 @@ export default function HomeScreen() {
             />
 
             <TextInput
-              placeholder="Find sports fields..."
+              placeholder="Tìm kiếm sân thể thao..."
               placeholderTextColor="#9CA3AF"
               style={[styles.input, darkMode && { color: "#fff" }]}
+              value={searchText}
+              onChangeText={handleSearch}
+              onSubmitEditing={submitSearch}
+              returnKeyType="search"
             />
+
+            {searchText !== "" && (
+              <TouchableOpacity onPress={() => {setSearchText(""); fetchFields("");}}>
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
         {/* CATEGORY */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryContainer}
-        >
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={[styles.categoryButton, darkMode && { backgroundColor: "#1F2937" }]}
-            >
-              <Text style={[styles.categoryText, darkMode && { color: "#fff" }]}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContainer}
+          >
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  darkMode && { backgroundColor: "#1F2937" },
+                  activeCategory === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setActiveCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryText,
+                  darkMode && { color: "#fff" },
+                  activeCategory === category && styles.categoryTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* FEATURED */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
-            Featured Fields
-          </Text>
+        {fields.length > 0 && activeCategory === "Tất cả" && !searchText && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
+              Sân bóng nổi bật
+            </Text>
 
-          {loading ? (
-            <ActivityIndicator size="large" color="#22C55E" />
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {fields.slice(0, 3).map((field) => (
-                <TouchableOpacity
-                  key={field?._id}
-                  style={[styles.featuredCard, darkMode && { backgroundColor: "#1F2937" }]}
-                  onPress={() =>
-                    router.push(`/field/${field?._id}`)
-                  }
-                >
-                  <Image
-                    source={{ uri: field?.images?.[0] || "https://images.unsplash.com/photo-1600130202712-fd01014ffa79" }}
-                    style={styles.featuredImage}
-                  />
-
-                  <View style={styles.cardContent}>
-                    <Text style={[styles.fieldName, darkMode && { color: "#fff" }]} numberOfLines={1}>
-                      {field?.field_name}
-                    </Text>
-
-                    <View style={styles.rowBetween}>
-                      <View style={styles.row}>
+            {loading ? (
+              <ActivityIndicator size="large" color="#22C55E" />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {fields.slice(0, 3).map((field: any) => (
+                  <TouchableOpacity
+                    key={field?._id}
+                    style={[styles.featuredCard, darkMode && { backgroundColor: "#1F2937" }]}
+                    onPress={() =>
+                      router.push(`/field/${field?._id}`)
+                    }
+                  >
+                    <View style={styles.imageContainer}>
+                      <Image
+                        source={{ uri: getImageUrl(field?.images?.[0]) }}
+                        style={styles.featuredImage}
+                      />
+                      <TouchableOpacity
+                        style={styles.favoriteBadge}
+                        onPress={() => handleToggleFavorite(field?._id)}
+                      >
                         <Ionicons
-                          name="star"
-                          size={16}
-                          color="#FACC15"
+                          name={favorites.includes(field?._id) ? "heart" : "heart-outline"}
+                          size={20}
+                          color={favorites.includes(field?._id) ? "#EF4444" : "#fff"}
                         />
-
-                        <Text style={darkMode && { color: "#9CA3AF" }}>{field?.users_rate || 5.0}</Text>
-                      </View>
-
-                      <Text style={styles.price}>
-                        {field?.price_per_hour?.toLocaleString('vi-VN')}đ/h
-                      </Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+
+                    <View style={styles.cardContent}>
+                      <Text style={[styles.fieldName, darkMode && { color: "#fff" }]} numberOfLines={1}>
+                        {field?.field_name}
+                      </Text>
+
+                      <View style={styles.rowBetween}>
+                        <View style={styles.row}>
+                          <Ionicons
+                            name="star"
+                            size={16}
+                            color="#FACC15"
+                          />
+
+                          <Text style={darkMode && { color: "#9CA3AF" }}>{field?.users_rate || 5.0}</Text>
+                        </View>
+
+                        <Text style={styles.price}>
+                          {field?.price_per_hour?.toLocaleString('vi-VN')}đ/h
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         {/* NEARBY (All Fields) */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, darkMode && { color: "#fff" }]}>
-            All Fields
+            {searchText ? `Kết quả tìm kiếm "${searchText}"` : activeCategory === "Tất cả" ? "Tất cả sân bóng" : `Sân ${activeCategory}`}
           </Text>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#22C55E" />
-          ) : (
-            fields.map((field) => (
+            <ActivityIndicator size="large" color="#22C55E" style={{ marginTop: 20 }} />
+          ) : fields.length > 0 ? (
+            fields.map((field: any) => (
               <TouchableOpacity
                 key={field?._id}
                 style={[styles.nearbyCard, darkMode && { backgroundColor: "#1F2937" }]}
@@ -187,10 +274,22 @@ export default function HomeScreen() {
                   router.push(`/field/${field?._id}`)
                 }
               >
-                <Image
-                  source={{ uri: field?.images?.[0] || "https://images.unsplash.com/photo-1705593813682-033ee2991df6" }}
-                  style={styles.nearbyImage}
-                />
+                <View style={styles.nearbyImageContainer}>
+                  <Image
+                    source={{ uri: getImageUrl(field?.images?.[0]) }}
+                    style={styles.nearbyImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.smallFavoriteBadge}
+                    onPress={() => handleToggleFavorite(field?._id)}
+                  >
+                    <Ionicons
+                      name={favorites.includes(field?._id) ? "heart" : "heart-outline"}
+                      size={16}
+                      color={favorites.includes(field?._id) ? "#EF4444" : "#fff"}
+                    />
+                  </TouchableOpacity>
+                </View>
 
                 <View style={styles.nearbyContent}>
                   <View>
@@ -199,7 +298,7 @@ export default function HomeScreen() {
                     </Text>
 
                     <Text style={[styles.distance, darkMode && { color: "#9CA3AF" }]} numberOfLines={1}>
-                      {field?.address || "Location unavailable"}
+                      {field?.address || "Không có địa chỉ"}
                     </Text>
                   </View>
 
@@ -221,6 +320,11 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
             ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={60} color="#CBD5E1" />
+              <Text style={styles.emptyText}>Không tìm thấy sân bóng nào phù hợp</Text>
+            </View>
           )}
         </View>
 
@@ -301,9 +405,17 @@ const styles = StyleSheet.create({
     ...getShadow(0.05, 6, 2),
   },
 
+  categoryButtonActive: {
+    backgroundColor: "#22C55E",
+  },
+
   categoryText: {
     fontWeight: "600",
     color: "#374151",
+  },
+
+  categoryTextActive: {
+    color: "#fff",
   },
 
   section: {
@@ -312,7 +424,7 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
     marginBottom: 16,
     color: "#111827",
@@ -375,6 +487,42 @@ const styles = StyleSheet.create({
     height: 110,
   },
 
+  imageContainer: {
+    position: 'relative',
+  },
+
+  nearbyImageContainer: {
+    position: 'relative',
+    width: 110,
+    height: 110,
+  },
+
+  favoriteBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+
+  smallFavoriteBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+
   nearbyContent: {
     flex: 1,
     padding: 14,
@@ -384,5 +532,19 @@ const styles = StyleSheet.create({
   distance: {
     color: "#6B7280",
     marginTop: 4,
+  },
+
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 40,
+    padding: 20,
+  },
+
+  emptyText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: "#94A3B8",
+    textAlign: "center",
   },
 });

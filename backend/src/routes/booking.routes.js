@@ -6,8 +6,12 @@ const { protect, authorize } = require('../middleware/auth.middleware');
 router.use(protect);
 
 router.post('/', authorize('customer'), bookingController.createBooking);
+router.get('/busy-slots', bookingController.getBusySlots);
 router.get('/my', authorize('customer'), bookingController.getMyBookings);
+router.get('/owner', authorize('owner'), bookingController.getOwnerBookings);
+router.get('/admin/all', authorize('admin'), bookingController.getAllBookings);
 router.get('/:id', bookingController.getBookingById); // Ownership checked in service
 router.patch('/:id/cancel', authorize('customer'), bookingController.cancelBooking);
+router.patch('/:id/status', authorize('owner', 'admin'), bookingController.updateBookingStatus);
 
 module.exports = router;

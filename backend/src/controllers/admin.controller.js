@@ -28,10 +28,38 @@ const blockUser = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    // Service đang đặt tên hàm xóa là softDeleteUser (dù logic là xóa cứng)
+    await adminService.softDeleteUser(req.params.id);
+    return sendResponse(res, 200, true, 'User deleted successfully');
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const createUser = async (req, res) => {
+  try {
+    const user = await adminService.createUser(req.body);
+    return sendResponse(res, 201, true, 'User created successfully', user);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 const getAllFields = async (req, res) => {
   try {
     const fields = await adminService.getAllFields();
     return sendResponse(res, 200, true, 'Fields retrieved successfully', fields);
+  } catch (error) {
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
+const updateFieldStatus = async (req, res) => {
+  try {
+    const field = await adminService.updateFieldStatus(req.params.id, req.body.status);
+    return sendResponse(res, 200, true, 'Field status updated successfully', field);
   } catch (error) {
     return sendResponse(res, 400, false, error.message);
   }
@@ -50,6 +78,9 @@ module.exports = {
   getDashboard,
   getAllUsers,
   blockUser,
+  deleteUser,
+  createUser,
   getAllFields,
+  updateFieldStatus,
   getAllBookings
 };

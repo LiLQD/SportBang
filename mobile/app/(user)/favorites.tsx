@@ -13,18 +13,19 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
-import { favoriteService } from "@/src/services/favorite.service";
+import { getImageUrl } from "@/src/utils/helpers";
 import { getShadow } from "@/src/utils/style";
 import { useAuthStore } from "@/src/store/auth.store";
+import { favoriteService } from "@/src/services/favorite.service";
 
-const sportsCategories = ["All", "Football", "Badminton", "Tennis", "Basketball"];
+const sportsCategories = ["Tất cả", "Bóng đá", "Cầu lông", "Tennis", "Bóng rổ"];
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { darkMode } = useAuthStore();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSport, setSelectedSport] = useState("All");
+  const [selectedSport, setSelectedSport] = useState("Tất cả");
   const [searchQuery, setSearchQuery] = useState("");
 
   useFocusEffect(
@@ -58,9 +59,12 @@ export default function FavoritesScreen() {
   };
 
   const filteredFields = favorites.filter(field => {
-    const matchesSport = selectedSport === "All" || field.field_type?.includes(selectedSport);
-    const matchesSearch = field.field_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         field.address.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!field) return false;
+    const matchesSport = selectedSport === "Tất cả" ||
+                         (field.sport_type && field.sport_type.includes(selectedSport)) ||
+                         (field.field_type && field.field_type.includes(selectedSport));
+    const matchesSearch = (field.field_name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (field.address?.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesSport && matchesSearch;
   });
 
@@ -70,7 +74,7 @@ export default function FavoritesScreen() {
       onPress={() => router.push(`/field/${item._id}`)}
     >
       <Image
-        source={{ uri: item.images?.[0] || "https://images.unsplash.com/photo-1567792264121-682b7b4d9376" }}
+        source={{ uri: getImageUrl(item.images?.[0]) }}
         style={styles.image}
       />
       <View style={styles.cardContent}>

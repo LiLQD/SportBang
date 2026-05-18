@@ -1,14 +1,19 @@
 const jwt = require('jsonwebtoken');
 
 const generateToken = (user) => {
-  const payload = {
-    id: user._id,
-    role: user.role
-  };
-  
-  return jwt.sign(payload, process.env.JWT_SECRET || 'secretkey', {
-    expiresIn: '7d'
-  });
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET || 'secretkey',
+    { expiresIn: '7d' } // Tăng lên 7 ngày để test ổn định
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user._id },
+    process.env.REFRESH_SECRET || 'refreshsecretkey',
+    { expiresIn: '30d' }
+  );
 };
 
 const verifyToken = (token) => {
@@ -17,5 +22,6 @@ const verifyToken = (token) => {
 
 module.exports = {
   generateToken,
+  generateRefreshToken,
   verifyToken
 };

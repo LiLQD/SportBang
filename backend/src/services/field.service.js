@@ -1,4 +1,5 @@
 const Field = require('../models/Field');
+const mongoose = require('mongoose');
 
 const timeToMinutes = (time) => {
   if (!time || !time.includes(':')) return 0;
@@ -27,29 +28,58 @@ const validateSlots = (slots) => {
 };
 
 const getAllFields = async (query, user) => {
-  const filter = { isDeleted: false };
+  const filter = { isDeleted: false, status: { $ne: 'deleted' } };
   
-  // Customers should not see inactive fields
+  // Khách hàng chỉ thấy các sân đang hoạt động
   if (!user || user.role === 'customer') {
     filter.status = 'active';
   }
   
-  // Optional search by name
-  if (query.field_name) {
-    filter.field_name = { $regex: query.field_name, $options: 'i' };
+  // Tìm kiếm theo tên (không phân biệt hoa thường)
+  if (query.search) {
+    filter.field_name = { $regex: query.search, $options: 'i' };
   }
   
-  // Optional filter by owner
+  // Lọc theo loại môn thể thao (Bóng đá, Cầu lông,...)
+  if (query.sport_type && query.sport_type !== 'Tất cả') {
+    filter.sport_type = query.sport_type;
+  }
+
+  // Lọc theo chủ sân (nếu cần)
   if (query.owner_id) {
     filter.owner_id = query.owner_id;
   }
 
-  return await Field.find(filter).populate('owner_id', 'full_name email phone');
+  return await Field.find(filter)
+    .populate('owner_id', 'full_name email phone')
+    .sort({ createdAt: -1 });
+};
+
+const getFieldsByOwner = async (ownerId) => {
+  try {
+    const idStr = ownerId.toString();
+    const queryId = new mongoose.Types.ObjectId(idStr);
+
+    console.log(`[Service] Đang tìm sân cho ID: ${queryId}`);
+
+    // Truy vấn linh hoạt: Lấy mọi sân của chủ sở hữu này trừ những sân đã xóa
+    const fields = await Field.find({
+      owner_id: queryId,
+      isDeleted: false,
+      status: { $ne: 'deleted' }
+    }).sort({ createdAt: -1 });
+
+    console.log(`[Service] Kết quả: Tìm thấy ${fields.length} sân trong cơ sở dữ liệu.`);
+    return fields;
+  } catch (error) {
+    console.error("[Service] Lỗi khi truy vấn danh sách sân:", error);
+    return [];
+  }
 };
 
 const getFieldById = async (id, user) => {
   const field = await Field.findById(id).populate('owner_id', 'full_name email phone');
-  if (!field || field.isDeleted) {
+  if (!field || field.isDeleted || field.status === 'deleted') {
     throw new Error('Field not found');
   }
   
@@ -64,10 +94,13 @@ const createField = async (payload, ownerId) => {
   if (payload.available_time) {
     validateSlots(payload.available_time);
   }
-  
+
+  // Đảm bảo owner_id được lưu dưới dạng ObjectId chuẩn
+  const finalOwnerId = new mongoose.Types.ObjectId(ownerId.toString());
+
   return await Field.create({
     ...payload,
-    owner_id: ownerId
+    owner_id: finalOwnerId
   });
 };
 
@@ -86,7 +119,7 @@ const updateField = async (fieldId, payload, user) => {
     validateSlots(payload.available_time);
   }
   
-  return await Field.findByIdAndUpdate(fieldId, payload, { new: true });
+  return await Field.findByIdAndUpdate(fieldId, payload, { returnDocument: 'after' });
 };
 
 const updateFieldStatus = async (fieldId, status, user) => {
@@ -99,8 +132,34 @@ const updateFieldStatus = async (fieldId, status, user) => {
     throw new Error('Not authorized to update this field status');
   }
   
+  const oldStatus = field.status;
   field.status = status;
-  return await field.save();
+  const savedField = await field.save();
+
+  // Create notifications for users who have upcoming bookings at this field if status becomes maintenance or inactive
+  if (status === 'maintenance' || status === 'inactive' || status === 'deleted') {
+    const Booking = require('../models/Booking');
+    const upcomingBookings = await Booking.find({
+      field_id: fieldId,
+      booking_date: { $gte: new Date().setUTCHours(0,0,0,0) },
+      status: { $in: ['pending', 'confirmed'] }
+    }).populate('user_id');
+
+    const Notification = require('../models/Notification');
+    const statusText = status === 'maintenance' ? 'đang bảo trì' : (status === 'deleted' ? 'đã bị xóa' : 'tạm ngưng hoạt động');
+
+    for (const booking of upcomingBookings) {
+      await Notification.create({
+        user_id: booking.user_id._id,
+        title: 'Thông báo về sân đặt của bạn',
+        message: `Sân "${field.field_name}" mà bạn đã đặt vào ngày ${booking.booking_date.toLocaleDateString('vi-VN')} hiện ${statusText}. Vui lòng liên hệ chủ sân để biết thêm chi tiết.`,
+        type: 'system',
+        data: { field_id: fieldId, booking_id: booking._id }
+      });
+    }
+  }
+
+  return savedField;
 };
 
 const deleteField = async (fieldId, user) => {
@@ -114,6 +173,7 @@ const deleteField = async (fieldId, user) => {
   }
 
   field.isDeleted = true;
+  field.status = 'deleted';
   return await field.save();
 };
 
@@ -194,6 +254,7 @@ const removeImage = async (fieldId, imagePath, user) => {
 module.exports = {
   getAllFields,
   getFieldById,
+  getFieldsByOwner,
   createField,
   updateField,
   updateFieldStatus,

@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { getImageUrl } from "@/src/utils/helpers";
 import { fieldService } from "@/src/services/field.service";
 import { reviewService } from "@/src/services/review.service";
 import { favoriteService } from "@/src/services/favorite.service";
@@ -38,31 +39,40 @@ export default function FieldDetailScreen() {
   const fetchFieldData = async () => {
     try {
       setLoading(true);
-      const [fieldRes, reviewRes, favRes] = await Promise.all([
-        fieldService.getFieldById(id),
-        reviewService.getFieldReviews(id),
-        favoriteService.getFavorites()
-      ]);
 
-      // Trích xuất data từ structure { success, message, data }
-      if (fieldRes && fieldRes.data) {
-        setField(fieldRes.data);
+      // 1. Lấy thông tin sân bóng trước (Bắt buộc)
+      try {
+        const fieldRes = await fieldService.getFieldById(id);
+        if (fieldRes && fieldRes.data) {
+          setField(fieldRes.data);
+        }
+      } catch (err) {
+        console.error("Error fetching field details:", err);
       }
 
-      if (reviewRes && reviewRes.data && Array.isArray(reviewRes.data)) {
-        setReviews(reviewRes.data);
-      } else {
-        setReviews([]);
+      // 2. Lấy dữ liệu phụ (Không bắt buộc, lỗi cũng không sao)
+      try {
+        const [reviewRes, favRes] = await Promise.allSettled([
+          reviewService.getFieldReviews(id),
+          favoriteService.getFavorites()
+        ]);
+
+        if (reviewRes.status === 'fulfilled' && reviewRes.value?.data) {
+          setReviews(reviewRes.value.data);
+        } else {
+          setReviews([]);
+        }
+
+        if (favRes.status === 'fulfilled' && favRes.value?.data && Array.isArray(favRes.value.data)) {
+          const isFav = favRes.value.data.some((f: any) => f._id === id);
+          setIsFavorite(isFav);
+        }
+      } catch (err) {
+        console.error("Error fetching supplemental data:", err);
       }
 
-      // Kiểm tra xem sân này có trong danh sách yêu thích không
-      if (favRes && favRes.data && Array.isArray(favRes.data)) {
-        const isFav = favRes.data.some((f: any) => f._id === id);
-        setIsFavorite(isFav);
-      }
     } catch (error) {
-      console.error("Error fetching field data:", error);
-      setReviews([]);
+      console.error("Unexpected error in fetchFieldData:", error);
     } finally {
       setLoading(false);
     }
@@ -131,9 +141,15 @@ export default function FieldDetailScreen() {
     );
   }
 
-  const fieldImages = field.images?.length > 0 ? field.images : [
-    "https://images.unsplash.com/photo-1716745559715-282bb61e3012",
-  ];
+  // Khai báo các biến bổ trợ hiển thị (Phải đặt sau check !field)
+  const totalReviews = reviews.length;
+  const averageRating = totalReviews > 0
+    ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / totalReviews).toFixed(1)
+    : (field.users_rate || "5.0");
+
+  const fieldImages = field.images && field.images.length > 0
+    ? field.images
+    : ["https://images.unsplash.com/photo-1716745559715-282bb61e3012"];
 
   return (
     <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
@@ -152,7 +168,7 @@ export default function FieldDetailScreen() {
           {fieldImages.map((img: string, index: number) => (
             <Image
               key={index}
-              source={{ uri: img }}
+              source={{ uri: getImageUrl(img) }}
               style={styles.image}
             />
           ))}
@@ -182,11 +198,11 @@ export default function FieldDetailScreen() {
               />
 
               <Text style={[styles.rating, darkMode && { color: "#fff" }]}>
-                {field.users_rate || "5.0"}
+                {averageRating}
               </Text>
 
               <Text style={[styles.review, darkMode && { color: "#9CA3AF" }]}>
-                ({field.reviewCount || 0} reviews)
+                ({totalReviews} reviews)
               </Text>
             </View>
           </View>

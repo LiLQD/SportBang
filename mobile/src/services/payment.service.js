@@ -18,4 +18,8 @@ export const paymentService = {
       body: JSON.stringify({ status }),
     });
   },
+
+  getPaymentById: async (id) => {
+    return await apiCall(`/payments/${id}`);
+  },
 };

@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { authService } from "../services/auth.service";
+import { setAuthToken } from "../services/api";
 
 interface AuthState {
   user: any | null;
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
       isHydrated: false,
 
       setAuth: (user, token, refreshToken) => {
+        setAuthToken(token); // Cập nhật token cho API layer
         set({
           user: user || null,
           token: token || null,
@@ -46,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
           console.error("Logout API error:", error);
         } finally {
           // 2. Xóa State trong bộ nhớ
+          setAuthToken(null); // Xóa token ở API layer
           set({ user: null, token: null, refreshToken: null });
 
           // 3. Xóa thủ công trong Storage để chắc chắn
@@ -68,7 +71,18 @@ export const useAuthStore = create<AuthState>()(
       name: "sportbang-auth-v11",
       storage: createJSONStorage(() => (Platform.OS === "web" ? window.localStorage : AsyncStorage)),
       onRehydrateStorage: () => (state) => {
-        state?.setHydrated(true);
+        // Hẹn giờ một chút để đảm bảo Native Module đã sẵn sàng
+        setTimeout(() => {
+          console.log("[AuthStore] Quá trình khôi phục hoàn tất.");
+          if (state) {
+            setAuthToken(state.token);
+            state.setHydrated(true);
+            console.log("[AuthStore] Đã khôi phục token:", state.token);
+          } else {
+            useAuthStore.getState().setHydrated(true);
+            console.log("[AuthStore] Không tìm thấy dữ liệu cũ.");
+          }
+        }, 0);
       },
       partialize: (state) => ({
         user: state.user,

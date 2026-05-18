@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useState, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,11 +18,12 @@ export default function BookingsList() {
   const { darkMode } = useAuthStore();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const res = await ownerService.getBookings();
       if (res.success) {
         setBookings(res.data);
@@ -30,8 +32,14 @@ export default function BookingsList() {
       console.error("Error fetching bookings:", error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchBookings(false);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -44,7 +52,7 @@ export default function BookingsList() {
   const renderBookingItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[styles.bookingCard, darkMode && { backgroundColor: "#1F2937" }]}
-      onPress={() => router.push(`/(owner)/booking-detail/${item.id}` as any)}
+      onPress={() => router.push(`/owner/booking-detail/${item._id || item.id}` as any)}
     >
       <View style={styles.bookingLeft}>
         <View style={styles.dateBox}>
@@ -54,13 +62,17 @@ export default function BookingsList() {
       </View>
       <View style={styles.bookingRight}>
         <View style={styles.bookingHeader}>
-          <Text style={[styles.userName, darkMode && { color: "#fff" }]}>{item.user_name}</Text>
+          <Text style={[styles.userName, darkMode && { color: "#fff" }]}>
+            {item.user_id?.full_name || item.user_name || "Khách"}
+          </Text>
           <Text style={styles.bookingPrice}>{item.total_price?.toLocaleString()}đ</Text>
         </View>
-        <Text style={styles.fieldName}>{item.field_name}</Text>
+        <Text style={styles.fieldName}>{item.field_id?.field_name || item.field_name}</Text>
         <View style={styles.timeInfo}>
           <Ionicons name="time-outline" size={14} color="#64748B" />
-          <Text style={styles.timeText}>{item.start_time} - {item.end_time}</Text>
+          <Text style={styles.timeText}>
+            {item.booking_slot?.start || item.start_time} - {item.booking_slot?.end || item.end_time}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -96,8 +108,16 @@ export default function BookingsList() {
         <FlatList
           data={filteredBookings}
           renderItem={renderBookingItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item._id || item.id).toString()}
           contentContainerStyle={{ padding: 15 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#22C55E"]}
+              tintColor={darkMode ? "#fff" : "#22C55E"}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={{ color: darkMode ? '#9CA3AF' : '#64748B' }}>Không có đơn đặt nào</Text>

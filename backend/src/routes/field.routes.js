@@ -4,8 +4,13 @@ const fieldController = require('../controllers/field.controller');
 const { protect, authorize, optionalProtect } = require('../middleware/auth.middleware');
 const upload = require('../middleware/upload.middleware');
 
-// Public routes with optional user for filtering
+// Public routes
 router.get('/', optionalProtect, fieldController.getAllFields);
+
+// Owner routes (Phải đặt trước các route có tham số :id)
+router.get('/owner/my-fields', protect, authorize('owner'), fieldController.getMyFields);
+
+// Field detail
 router.get('/:id', optionalProtect, fieldController.getFieldById);
 
 // Protected routes (Owner and Admin only)

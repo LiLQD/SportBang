@@ -19,11 +19,27 @@ const getFieldById = async (req, res) => {
   }
 };
 
+const getMyFields = async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    console.log(`[API] Đang lấy danh sách sân cho chủ sân ID: ${ownerId}`);
+    const fields = await fieldService.getFieldsByOwner(ownerId);
+    console.log(`[API] Tìm thấy ${fields.length} sân.`);
+    return sendResponse(res, 200, true, 'Owner fields retrieved successfully', fields);
+  } catch (error) {
+    console.error("[API] Lỗi lấy danh sách sân:", error);
+    return sendResponse(res, 400, false, error.message);
+  }
+};
+
 const createField = async (req, res) => {
   try {
-    const field = await fieldService.createField(req.body, req.user.id);
+    console.log(`[API] Đang tạo sân mới cho chủ sân: ${req.user._id}`);
+    const field = await fieldService.createField(req.body, req.user._id);
+    console.log(`[API] Tạo sân thành công: ${field.field_name} (ID: ${field._id})`);
     return sendResponse(res, 201, true, 'Field created successfully', field);
   } catch (error) {
+    console.error("[API] Lỗi tạo sân:", error);
     return sendResponse(res, 400, false, error.message);
   }
 };
@@ -115,6 +131,7 @@ const deleteImage = async (req, res) => {
 module.exports = {
   getAllFields,
   getFieldById,
+  getMyFields,
   createField,
   updateField,
   updateFieldStatus,
