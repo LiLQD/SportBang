@@ -7,263 +7,188 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  RefreshControl,
+  ScrollView,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { bookingService } from "@/src/services/booking.service";
+import { adminService } from "@/src/services/admin.service";
 import { useAuthStore } from "@/src/store/auth.store";
+import { getShadow } from "@/src/utils/style";
 
-type Status = "pending" | "approved" | "confirmed" | "cancelled" | "completed";
+type Status = "pending" | "confirmed" | "completed" | "cancelled";
 
 export default function AdminBookings() {
   const { darkMode } = useAuthStore();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
-  const [date, setDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchBookings = async () => {
+    try {
+      const res = await adminService.getAllBookings();
+      if (res.success) {
+        setBookings(res.data);
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     fetchBookings();
   }, []);
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      const data = await bookingService.getAllBookings();
-      setBookings(data);
-    } catch (error) {
-      console.error("Error fetching bookings:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchBookings();
+  }, []);
 
   const filtered = bookings.filter((b) => {
     const matchStatus = statusFilter === "all" || b.status === statusFilter;
-    const bookingDate = new Date(b.booking_date).toISOString().split('T')[0];
-    const matchDate = !date || bookingDate === date;
-    return matchStatus && matchDate;
+    const matchSearch =
+        b.user_id?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        b.field_id?.field_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        new Date(b.booking_date).toLocaleDateString().includes(searchQuery);
+    return matchStatus && matchSearch;
   });
 
-  const updateStatus = async (id: string, newStatus: string) => {
-    try {
-      await bookingService.updateBookingStatus(id, newStatus);
-      fetchBookings();
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message || "Cập nhật trạng thái thất bại");
-    }
-  };
-
-  const getColor = (s: string) => {
+  const getStatusStyle = (s: string) => {
     switch (s) {
-      case "pending":
-        return "#f59e0b";
-      case "approved":
-      case "confirmed":
-      case "completed":
-        return "#16a34a";
-      case "cancelled":
-        return "#6b7280";
-      default:
-        return "#6b7280";
+      case "pending": return { bg: "#FEF3C7", text: "#92400E", label: "Chờ duyệt" };
+      case "confirmed": return { bg: "#DBEAFE", text: "#1E40AF", label: "Đã xác nhận" };
+      case "completed": return { bg: "#DCFCE7", text: "#166534", label: "Hoàn thành" };
+      case "cancelled": return { bg: "#FEE2E2", text: "#991B1B", label: "Đã hủy" };
+      default: return { bg: "#F1F5F9", text: "#64748B", label: s };
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={[styles.row, darkMode && { backgroundColor: "#1F2937" }]}>
-      <Text style={[styles.cell, darkMode && { color: "#fff" }]} numberOfLines={1}>{item.user_id?.full_name || "Unknown"}</Text>
-      <Text style={[styles.cell, darkMode && { color: "#fff" }]} numberOfLines={1}>{item.field_id?.field_name || "N/A"}</Text>
-      <Text style={[styles.cell, darkMode && { color: "#fff" }]}>{new Date(item.booking_date).toLocaleDateString()}</Text>
-      <Text style={[styles.cell, darkMode && { color: "#fff" }]}>{item.booking_slot?.start}-{item.booking_slot?.end}</Text>
-
-      {/* STATUS */}
-      <View
-        style={[
-          styles.badge,
-          { backgroundColor: getColor(item.status) },
-        ]}
-      >
-        <Text style={styles.badgeText}>{item.status}</Text>
-      </View>
-
-      {/* ACTION */}
-      <View style={styles.actions}>
-        {item.status === "pending" && (
-          <>
-            <TouchableOpacity
-              onPress={() => updateStatus(item._id, "confirmed")}
-            >
-              <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => updateStatus(item._id, "cancelled")}
-            >
-              <Ionicons name="close-circle" size={24} color="#ef4444" />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
-  );
-
-  if (loading && bookings.length === 0) {
+  const renderItem = ({ item }: { item: any }) => {
+    const status = getStatusStyle(item.status);
     return (
-      <View style={[styles.centered, darkMode && { backgroundColor: "#111827" }]}>
-        <ActivityIndicator size="large" color="#16a34a" />
+      <View style={[styles.card, darkMode && { backgroundColor: "#1F2937" }]}>
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.fieldName, darkMode && { color: "#fff" }]}>{item.field_id?.field_name || "N/A"}</Text>
+            <Text style={styles.customerName}>Khách: <Text style={{fontWeight: '600'}}>{item.user_id?.full_name || "Unknown"}</Text></Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+            <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailsRow}>
+          <View style={styles.detailItem}>
+            <Ionicons name="calendar-outline" size={14} color="#64748B" />
+            <Text style={styles.detailText}>{new Date(item.booking_date).toLocaleDateString('vi-VN')}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="time-outline" size={14} color="#64748B" />
+            <Text style={styles.detailText}>{item.booking_slot?.start} - {item.booking_slot?.end}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="cash-outline" size={14} color="#16a34a" />
+            <Text style={[styles.detailText, {color: '#16a34a', fontWeight: 'bold'}]}>{item.total_price.toLocaleString()}đ</Text>
+          </View>
+        </View>
       </View>
     );
-  }
+  };
 
   return (
     <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
-      <Text style={[styles.title, darkMode && { color: "#fff" }]}>Booking Management</Text>
-
-      {/* FILTER */}
-      <View style={[styles.filter, darkMode && { backgroundColor: "#1F2937" }]}>
-        <View style={[styles.inputBox, darkMode && { borderColor: "#374151" }]}>
-          <Ionicons name="calendar-outline" size={16} color={darkMode ? "#9CA3AF" : "#111827"} />
+      {/* SEARCH & FILTER */}
+      <View style={styles.filterContainer}>
+        <View style={[styles.searchBar, darkMode && { backgroundColor: "#1F2937", borderColor: "#374151" }]}>
+          <Ionicons name="search" size={20} color="#64748B" />
           <TextInput
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={darkMode ? "#4B5563" : "#9CA3AF"}
-            value={date}
-            onChangeText={setDate}
-            style={[{ flex: 1 }, darkMode && { color: "#fff" }]}
+            placeholder="Tìm theo tên khách, sân hoặc ngày..."
+            placeholderTextColor="#94A3B8"
+            style={[styles.searchInput, darkMode && { color: "#fff" }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
 
-        <View style={styles.statusRow}>
-          {["all", "pending", "confirmed", "cancelled", "completed"].map((s) => (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusScroll}>
+          {["all", "pending", "confirmed", "completed", "cancelled"].map((s) => (
             <TouchableOpacity
               key={s}
               onPress={() => setStatusFilter(s as any)}
               style={[
                 styles.statusBtn,
-                darkMode && { borderColor: "#374151" },
-                statusFilter === s && styles.active,
+                darkMode && { backgroundColor: "#1F2937", borderColor: "#374151" },
+                statusFilter === s && styles.activeBtn,
               ]}
             >
-              <Text
-                style={
-                  statusFilter === s
-                    ? styles.activeText
-                    : [styles.text, darkMode && { color: "#9CA3AF" }]
-                }
-              >
-                {s}
+              <Text style={[styles.statusBtnText, statusFilter === s && styles.activeBtnText]}>
+                {s === 'all' ? 'Tất cả' : getStatusStyle(s).label}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
-      {/* HEADER TABLE */}
-      <View style={[styles.header, darkMode && { backgroundColor: "#1F2937" }]}>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>User</Text>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Field</Text>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Date</Text>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Time</Text>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Status</Text>
-        <Text style={[styles.cell, darkMode && { color: "#9CA3AF" }]}>Action</Text>
-      </View>
-
-      {/* LIST */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
-        refreshing={loading}
-        onRefresh={fetchBookings}
-        ListEmptyComponent={<Text style={[{ textAlign: 'center', marginTop: 20 }, darkMode && { color: "#9CA3AF" }]}>No bookings found</Text>}
+        contentContainerStyle={{ padding: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#16a34a"]} />
+        }
+        ListEmptyComponent={
+          loading ? null : <Text style={styles.emptyText}>Không tìm thấy đơn đặt nào</Text>
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#f9fafb" },
-
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 16,
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  filterContainer: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
   },
-
-  filter: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  inputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 10,
-  },
-
-  statusRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  statusScroll: { marginTop: 12, flexDirection: 'row' },
   statusBtn: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'transparent'
   },
-
-  active: {
-    backgroundColor: "#16a34a",
-    borderColor: "#16a34a",
+  activeBtn: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
+  statusBtnText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  activeBtnText: { color: '#fff' },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    ...getShadow(0.05, 10, 3),
   },
-
-  text: { color: "#333" },
-  activeText: { color: "#fff" },
-
-  header: {
-    flexDirection: "row",
-    backgroundColor: "#e5e7eb",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 5,
-  },
-
-  row: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 5,
-    alignItems: "center",
-  },
-
-  cell: {
-    flex: 1,
-    fontSize: 12,
-  },
-
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-
-  badgeText: {
-    color: "#fff",
-    fontSize: 10,
-  },
-
-  actions: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  fieldName: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
+  customerName: { fontSize: 13, color: '#64748B', marginTop: 4 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 11, fontWeight: 'bold' },
+  detailsRow: { flexDirection: 'row', marginTop: 16, gap: 12, flexWrap: 'wrap' },
+  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  detailText: { fontSize: 13, color: '#64748B' },
+  emptyText: { textAlign: 'center', marginTop: 40, color: '#94A3B8' }
 });

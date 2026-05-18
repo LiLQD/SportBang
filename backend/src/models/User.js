@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema({
     enum: ['active', 'blocked'],
     default: 'active'
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
   favorites: {
     type: [{
       type: mongoose.Schema.Types.ObjectId,
