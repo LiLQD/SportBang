@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
-  Alert,
   Modal,
   TextInput,
   ActivityIndicator,
@@ -17,16 +16,25 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/store/auth.store";
 import { router, useFocusEffect } from "expo-router";
 import { authService } from "@/src/services/auth.service";
+import { Toast, ToastType } from "@/src/components/Toast";
+import { ConfirmationModal } from "@/src/components/ConfirmationModal";
 
 export default function ProfileScreen() {
   const { user, logout, setAuth, token, darkMode, toggleDarkMode } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [realStats, setRealStats] = useState({ bookings: 0, favorites: 0, spent: 0 });
 
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  // Logout Modal State
+  const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
+
   // Edit State
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.full_name || "");
   const [editPhone, setEditPhone] = useState("");
+  const [editErrors, setEditErrors] = useState<{ full_name?: string; phone?: string }>({});
 
   // Change Password State
   const [isChangePassModalVisible, setIsChangePassModalVisible] = useState(false);
@@ -34,29 +42,23 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [passErrors, setPassErrors] = useState<{ oldPassword?: string; newPassword?: string; confirmPassword?: string }>({});
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   const handleLogout = async () => {
-    const performLogout = async () => {
-      try {
-        setLoading(true);
-        await logout();
-        router.replace("/(auth)/login");
-      } catch (err) {
-        console.error("Logout error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-        await performLogout();
-      }
-    } else {
-      Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
-        { text: "Hủy", style: "cancel" },
-        { text: "Đăng xuất", style: "destructive", onPress: performLogout },
-      ]);
+    try {
+      setLoading(true);
+      await logout();
+      router.replace("/(auth)/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      showToast("Đã xảy ra lỗi khi đăng xuất", "error");
+    } finally {
+      setLoading(false);
+      setIsLogoutModalVisible(false);
     }
   };
 
@@ -84,50 +86,67 @@ export default function ProfileScreen() {
   };
 
   const handleUpdateProfile = async () => {
+    // Validate
+    const errors: any = {};
+    if (!editName.trim()) errors.full_name = "Vui lòng nhập họ tên";
+    if (!editPhone.trim()) errors.phone = "Vui lòng nhập số điện thoại";
+
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      return;
+    }
+
     try {
       const res = await authService.updateProfile({
         full_name: editName,
         phone: editPhone
       });
       if (res && res.data) {
-        Alert.alert("Thành công", "Đã cập nhật thông tin cá nhân");
+        showToast("Đã cập nhật thông tin cá nhân");
         setIsEditModalVisible(false);
+        setEditErrors({});
         fetchProfile();
       }
     } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+      showToast(error.message || "Không thể cập nhật thông tin", "error");
     }
   };
 
   const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
-      return;
+    // Validate
+    const errors: any = {};
+    if (!oldPassword) errors.oldPassword = "Vui lòng nhập mật khẩu cũ";
+    if (!newPassword) errors.newPassword = "Vui lòng nhập mật khẩu mới";
+    if (!confirmPassword) errors.confirmPassword = "Vui lòng xác nhận mật khẩu mới";
+
+    if (newPassword && newPassword.length < 6) {
+      errors.newPassword = "Mật khẩu mới phải có ít nhất 6 ký tự";
     }
-    if (newPassword !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu mới không khớp");
-      return;
+    if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+      errors.confirmPassword = "Mật khẩu xác nhận không khớp";
     }
-    if (newPassword.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu mới phải có ít nhất 6 ký tự");
+
+    if (Object.keys(errors).length > 0) {
+      setPassErrors(errors);
       return;
     }
 
     try {
       setIsChangingPass(true);
+      setPassErrors({});
       const res = await authService.changePassword({ oldPassword, newPassword });
       if (res && res.success) {
-        Alert.alert("Thành công", "Đổi mật khẩu thành công");
+        showToast("Đổi mật khẩu thành công");
         setIsChangePassModalVisible(false);
         setOldPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        Alert.alert("Lỗi", res.message || "Không thể đổi mật khẩu");
+        showToast(res.message || "Không thể đổi mật khẩu", "error");
       }
     } catch (error: any) {
       console.error("Change password error:", error);
-      Alert.alert("Lỗi", error.message || "Mật khẩu cũ không chính xác");
+      showToast(error.message || "Mật khẩu cũ không chính xác", "error");
     } finally {
       setIsChangingPass(false);
     }
@@ -453,7 +472,7 @@ export default function ProfileScreen() {
       {/* LOGOUT */}
       <TouchableOpacity
         style={[styles.logoutButton, darkMode && { backgroundColor: "#1F2937" }]}
-        onPress={handleLogout}
+        onPress={() => setIsLogoutModalVisible(true)}
       >
         <Ionicons
           name="log-out-outline"
@@ -468,6 +487,27 @@ export default function ProfileScreen() {
 
       <View style={{ height: 40 }} />
 
+      {/* TOAST */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
+
+      {/* CONFIRMATION MODALS */}
+      <ConfirmationModal
+        visible={isLogoutModalVisible}
+        title="Đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?"
+        onConfirm={handleLogout}
+        onCancel={() => setIsLogoutModalVisible(false)}
+        type="danger"
+        confirmText="Đăng xuất"
+        darkMode={darkMode}
+      />
+
       {/* EDIT MODAL */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -477,30 +517,49 @@ export default function ProfileScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, darkMode && { color: "#D1D5DB" }]}>Họ và tên</Text>
               <TextInput
-                style={[styles.input, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+                style={[
+                  styles.input,
+                  darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" },
+                  editErrors.full_name && { borderColor: '#EF4444' }
+                ]}
                 value={editName}
-                onChangeText={setEditName}
+                onChangeText={(text) => {
+                  setEditName(text);
+                  if (editErrors.full_name) setEditErrors({ ...editErrors, full_name: undefined });
+                }}
                 placeholder="Nhập tên của bạn"
                 placeholderTextColor="#9CA3AF"
               />
+              {editErrors.full_name && <Text style={styles.errorText}>{editErrors.full_name}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, darkMode && { color: "#D1D5DB" }]}>Số điện thoại</Text>
               <TextInput
-                style={[styles.input, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+                style={[
+                  styles.input,
+                  darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" },
+                  editErrors.phone && { borderColor: '#EF4444' }
+                ]}
                 value={editPhone}
-                onChangeText={setEditPhone}
+                onChangeText={(text) => {
+                  setEditPhone(text);
+                  if (editErrors.phone) setEditErrors({ ...editErrors, phone: undefined });
+                }}
                 keyboardType="phone-pad"
                 placeholder="Nhập số điện thoại"
                 placeholderTextColor="#9CA3AF"
               />
+              {editErrors.phone && <Text style={styles.errorText}>{editErrors.phone}</Text>}
             </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: darkMode ? '#374151' : '#F3F4F6' }]}
-                onPress={() => setIsEditModalVisible(false)}
+                onPress={() => {
+                  setIsEditModalVisible(false);
+                  setEditErrors({});
+                }}
               >
                 <Text style={{ color: darkMode ? '#D1D5DB' : '#4B5563' }}>Hủy</Text>
               </TouchableOpacity>
@@ -524,43 +583,70 @@ export default function ProfileScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, darkMode && { color: "#D1D5DB" }]}>Mật khẩu cũ</Text>
               <TextInput
-                style={[styles.input, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+                style={[
+                  styles.input,
+                  darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" },
+                  passErrors.oldPassword && { borderColor: '#EF4444' }
+                ]}
                 value={oldPassword}
-                onChangeText={setOldPassword}
+                onChangeText={(text) => {
+                  setOldPassword(text);
+                  if (passErrors.oldPassword) setPassErrors({ ...passErrors, oldPassword: undefined });
+                }}
                 secureTextEntry
                 placeholder="Nhập mật khẩu hiện tại"
                 placeholderTextColor="#9CA3AF"
               />
+              {passErrors.oldPassword && <Text style={styles.errorText}>{passErrors.oldPassword}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, darkMode && { color: "#D1D5DB" }]}>Mật khẩu mới</Text>
               <TextInput
-                style={[styles.input, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+                style={[
+                  styles.input,
+                  darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" },
+                  passErrors.newPassword && { borderColor: '#EF4444' }
+                ]}
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={(text) => {
+                  setNewPassword(text);
+                  if (passErrors.newPassword) setPassErrors({ ...passErrors, newPassword: undefined });
+                }}
                 secureTextEntry
                 placeholder="Ít nhất 6 ký tự"
                 placeholderTextColor="#9CA3AF"
               />
+              {passErrors.newPassword && <Text style={styles.errorText}>{passErrors.newPassword}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, darkMode && { color: "#D1D5DB" }]}>Xác nhận mật khẩu mới</Text>
               <TextInput
-                style={[styles.input, darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" }]}
+                style={[
+                  styles.input,
+                  darkMode && { backgroundColor: "#374151", borderColor: "#4B5563", color: "#fff" },
+                  passErrors.confirmPassword && { borderColor: '#EF4444' }
+                ]}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (passErrors.confirmPassword) setPassErrors({ ...passErrors, confirmPassword: undefined });
+                }}
                 secureTextEntry
                 placeholder="Nhập lại mật khẩu mới"
                 placeholderTextColor="#9CA3AF"
               />
+              {passErrors.confirmPassword && <Text style={styles.errorText}>{passErrors.confirmPassword}</Text>}
             </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: darkMode ? '#374151' : '#F3F4F6' }]}
-                onPress={() => setIsChangePassModalVisible(false)}
+                onPress={() => {
+                  setIsChangePassModalVisible(false);
+                  setPassErrors({});
+                }}
                 disabled={isChangingPass}
               >
                 <Text style={{ color: darkMode ? '#D1D5DB' : '#4B5563' }}>Hủy</Text>
@@ -896,5 +982,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   }
 });

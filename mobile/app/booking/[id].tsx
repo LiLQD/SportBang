@@ -5,22 +5,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
-import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { fieldService } from "../../src/services/field.service";
 import { bookingService } from "../../src/services/booking.service";
 import { getImageUrl } from "../../src/utils/helpers";
 import { getShadow } from "../../src/utils/style";
 import { useAuthStore } from "../../src/store/auth.store";
+import { Toast, ToastType } from "../../src/components/Toast";
 
 const TIME_SLOTS = [
   "09:00", "10:00", "11:00", "12:00", "13:00", "14:00",
@@ -37,6 +35,13 @@ export default function BookingScreen() {
   const [selectedTime, setSelectedTime] = useState("");
   const [duration, setDuration] = useState(1);
   const [busySlots, setBusySlots] = useState<any[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const router = useRouter();
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
     if (id) fetchFieldDetails();
@@ -56,8 +61,7 @@ export default function BookingScreen() {
         setField(res.data);
       }
     } catch (error) {
-      if (Platform.OS === 'web') window.alert("Không thể lấy thông tin sân");
-      else Alert.alert("Lỗi", "Không thể lấy thông tin sân");
+      showToast("Không thể lấy thông tin sân", "error");
     } finally {
       setLoading(false);
     }
@@ -98,13 +102,13 @@ export default function BookingScreen() {
 
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime) {
-      const msg = "Vui lòng chọn ngày và giờ";
-      return Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Thông báo", msg);
+      showToast("Vui lòng chọn ngày và giờ", "info");
+      return;
     }
 
     if (isRangeBusy(selectedTime, duration)) {
-      const msg = "Khoảng thời gian bạn chọn có một phần đã bị người khác đặt. Vui lòng chọn giờ khác.";
-      return Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Lỗi", msg);
+      showToast("Khoảng thời gian này đã bị đặt. Vui lòng chọn giờ khác.", "error");
+      return;
     }
 
     try {
@@ -117,25 +121,18 @@ export default function BookingScreen() {
           start: selectedTime,
           end: addHours(selectedTime, duration)
         },
-        payment_method: 'momo' // Mặc định là momo để test luồng thanh toán online
+        payment_method: 'momo'
       };
 
       const res = await bookingService.createBooking(payload);
+      showToast("Đã đặt sân thành công!");
 
-      const successMsg = "Đã đặt sân thành công! Đang chuyển đến trang thanh toán...";
-      if (Platform.OS === 'web') {
-        window.alert(successMsg);
+      setTimeout(() => {
         router.replace(`/payment/${res.data.payment_id}`);
-      } else {
-        Alert.alert("Thành công", successMsg, [
-          { text: "OK", onPress: () => router.replace(`/payment/${res.data.payment_id}`) }
-        ]);
-      }
+      }, 1500);
     } catch (error: any) {
       console.error("[Booking] Error:", error);
-      const errorMsg = error.message || "Đặt sân thất bại";
-      if (Platform.OS === 'web') window.alert(errorMsg);
-      else Alert.alert("Lỗi", errorMsg);
+      showToast(error.message || "Đặt sân thất bại", "error");
     } finally {
       setBookingLoading(false);
     }
@@ -263,6 +260,14 @@ export default function BookingScreen() {
           {bookingLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Xác nhận đặt - {calculateTotal()?.toLocaleString('vi-VN')}đ</Text>}
         </TouchableOpacity>
       </View>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
     </View>
   );
 }

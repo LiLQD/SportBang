@@ -6,10 +6,8 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   Modal,
   TextInput,
-  Platform,
   RefreshControl,
 } from "react-native";
 
@@ -20,6 +18,8 @@ import { reviewService } from "@/src/services/review.service";
 import { bookingService } from "@/src/services/booking.service";
 import { getShadow } from "@/src/utils/style";
 import { useAuthStore } from "@/src/store/auth.store";
+import { Toast, ToastType } from "@/src/components/Toast";
+import { ConfirmationModal } from "@/src/components/ConfirmationModal";
 
 export default function BookingScreen() {
   const { darkMode } = useAuthStore();
@@ -31,6 +31,14 @@ export default function BookingScreen() {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // UI States
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => { fetchBookings(); }, []);
 
@@ -56,69 +64,20 @@ export default function BookingScreen() {
     fetchBookings();
   }, []);
 
-  const handleCancelBooking = (id: string) => {
-    // 1. Log để kiểm tra trong console debug
-    console.log("[BookingScreen] Clicked Cancel for ID:", id);
+  const handleCancelBooking = async () => {
+    if (!cancelBookingId) return;
 
-    // 2. Alert đơn giản để xác nhận nút có hoạt động hay không
-    if (!id) {
-      alert("Lỗi: Không tìm thấy ID đơn đặt sân.");
-      return;
-    }
-
-    const msg = "Bạn có chắc chắn muốn hủy đơn đặt sân này không?";
-
-    const executeCancel = async () => {
-      try {
-        setLoading(true);
-        console.log("[BookingScreen] Gọi API hủy sân...");
-        const response = await bookingService.cancelBooking(id);
-        console.log("[BookingScreen] Kết quả API:", response);
-
-        const successMsg = "Đã hủy đơn đặt sân thành công.";
-        if (Platform.OS === 'web') {
-          window.alert(successMsg);
-        } else {
-          Alert.alert("Thành công", successMsg);
-        }
-
-        await fetchBookings();
-      } catch (error: any) {
-        console.error("[BookingScreen] Lỗi khi hủy:", error);
-        const errorMsg = error.message || "Không thể hủy đơn đặt sân lúc này.";
-        if (Platform.OS === 'web') {
-          window.alert("Lỗi: " + errorMsg);
-        } else {
-          Alert.alert("Lỗi", errorMsg);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // 3. Xử lý xác nhận linh hoạt cho Web và Mobile
-    if (Platform.OS === 'web') {
-      const confirmCancel = window.confirm(msg);
-      if (confirmCancel) {
-        executeCancel();
-      }
-    } else {
-      Alert.alert(
-        "Xác nhận hủy",
-        msg,
-        [
-          { text: "Quay lại", style: "cancel" },
-          {
-            text: "Hủy sân",
-            style: "destructive",
-            onPress: () => {
-              console.log("[BookingScreen] User confirmed cancellation");
-              executeCancel();
-            }
-          }
-        ],
-        { cancelable: true }
-      );
+    try {
+      setLoading(true);
+      await bookingService.cancelBooking(cancelBookingId);
+      showToast("Đã hủy đơn đặt sân thành công");
+      await fetchBookings();
+    } catch (error: any) {
+      console.error("[BookingScreen] Lỗi khi hủy:", error);
+      showToast(error.message || "Không thể hủy đơn đặt sân lúc này", "error");
+    } finally {
+      setLoading(false);
+      setCancelBookingId(null);
     }
   };
 
@@ -132,10 +91,11 @@ export default function BookingScreen() {
         rating,
         comment,
       });
+      showToast("Gửi đánh giá thành công");
       setIsReviewModalVisible(false);
       fetchBookings();
     } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+      showToast(error.message || "Không thể gửi đánh giá", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -157,7 +117,7 @@ export default function BookingScreen() {
           {(item.status === 'pending' || item.status === 'confirmed') && (
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => handleCancelBooking(item._id)}
+              onPress={() => setCancelBookingId(item._id)}
               activeOpacity={0.7}
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
@@ -225,6 +185,27 @@ export default function BookingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* TOAST */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      <ConfirmationModal
+        visible={!!cancelBookingId}
+        title="Hủy đặt sân"
+        message="Bạn có chắc chắn muốn hủy đơn đặt sân này không?"
+        onConfirm={handleCancelBooking}
+        onCancel={() => setCancelBookingId(null)}
+        type="danger"
+        confirmText="Hủy sân"
+        darkMode={darkMode}
+      />
     </View>
   );
 }

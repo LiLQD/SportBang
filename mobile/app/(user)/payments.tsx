@@ -13,6 +13,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { paymentService } from "@/src/services/payment.service";
 import { getShadow } from "@/src/utils/style";
 import { useAuthStore } from "@/src/store/auth.store";
+import { Toast, ToastType } from "@/src/components/Toast";
 
 export default function PaymentHistoryScreen() {
   const router = useRouter();
@@ -20,6 +21,11 @@ export default function PaymentHistoryScreen() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   const fetchPayments = async () => {
     try {
@@ -27,8 +33,9 @@ export default function PaymentHistoryScreen() {
       if (res && res.data) {
         setPayments(res.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching payments:", error);
+      showToast(error.message || "Không thể tải lịch sử thanh toán", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,6 +155,14 @@ export default function PaymentHistoryScreen() {
           />
         )}
       </View>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
     </View>
   );
 }

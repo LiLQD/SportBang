@@ -4,11 +4,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
+  Modal,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,8 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/src/store/auth.store";
 import { paymentService } from "@/src/services/payment.service";
 import { getShadow } from "@/src/utils/style";
-
-import * as WebBrowser from "expo-web-browser";
+import { Toast, ToastType } from "@/src/components/Toast";
 
 export default function PaymentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,27 +26,34 @@ export default function PaymentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
+  // Toast state
+  const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
+
   // Card states
   const [showCardForm, setShowCardForm] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardHolder, setCardHolder] = useState('');
+  const [formErrors, setFormErrors] = useState<any>({});
 
   useEffect(() => {
     fetchPaymentDetail();
   }, [id]);
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   const fetchPaymentDetail = async () => {
     try {
       const res = await paymentService.getPaymentById(id as string);
       if (res && res.success) {
         setPayment(res.data);
-      } else {
-        console.error("Payment not found in response");
       }
     } catch (error) {
       console.error("Error fetching payment:", error);
+      showToast("Không thể tải thông tin thanh toán", "error");
     } finally {
       setLoading(false);
     }
@@ -57,59 +63,41 @@ export default function PaymentDetailScreen() {
     try {
       setProcessing(true);
       await paymentService.updatePaymentStatus(id as string, 'pending');
-      const msg = "Đã ghi nhận yêu cầu thanh toán tại sân. Vui lòng thanh toán khi đến nhận sân!";
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert("Thành công", msg);
-      router.replace("/(user)/payments");
+      showToast("Đã ghi nhận yêu cầu thanh toán tại sân!");
+      setTimeout(() => router.replace("/(user)/payments"), 2000);
     } catch (error: any) {
-      const errorMsg = error.message || "Không thể cập nhật phương thức thanh toán.";
-      if (Platform.OS === 'web') window.alert(errorMsg);
-      else Alert.alert("Lỗi", errorMsg);
+      showToast(error.message || "Không thể cập nhật phương thức thanh toán.", "error");
     } finally {
       setProcessing(false);
     }
   };
 
+  const validateCard = () => {
+    let errors: any = {};
+    if (!cardHolder || cardHolder.length < 3) errors.cardHolder = "Tên không hợp lệ";
+    if (cardNumber.length < 16) errors.cardNumber = "Số thẻ phải đủ 16 chữ số";
+    if (!expiry.includes('/') || expiry.length < 5) errors.expiry = "Định dạng MM/YY";
+    if (cvv.length < 3) errors.cvv = "Mã CVV không hợp lệ";
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCardPayment = async () => {
-    // Basic validation
-    if (!cardHolder || cardHolder.length < 3) {
-      Alert.alert("Lỗi", "Vui lòng nhập tên chủ thẻ hợp lệ");
-      return;
-    }
-    if (cardNumber.length < 16) {
-      Alert.alert("Lỗi", "Số thẻ phải đủ 16 chữ số");
-      return;
-    }
-    if (!expiry.includes('/') || expiry.length < 5) {
-      Alert.alert("Lỗi", "Định dạng ngày hết hạn không đúng (MM/YY)");
-      return;
-    }
-    if (cvv.length < 3) {
-      Alert.alert("Lỗi", "Mã CVV không hợp lệ");
-      return;
-    }
+    if (!validateCard()) return;
 
     try {
       setProcessing(true);
-
-      // Giả lập xử lý thanh toán và cập nhật trạng thái trực tiếp
-      // Vì là môi trường học tập/demo, ta gọi thẳng API update trạng thái sang 'paid'
       const res = await paymentService.updatePaymentStatus(id as string, 'paid');
 
       if (res && res.success) {
-        const msg = "Thanh toán thành công! Đơn đặt sân của bạn đã được xác nhận.";
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert("Thành công", msg);
-
-        router.replace("/(user)/payments");
+        showToast("Thanh toán thành công!");
+        setTimeout(() => router.replace("/(user)/payments"), 2000);
       } else {
-        throw new Error(res?.message || "Không thể cập nhật trạng thái thanh toán");
+        throw new Error(res?.message || "Thanh toán thất bại");
       }
-
     } catch (error: any) {
-      const errorMsg = error.message || "Thanh toán thất bại. Vui lòng thử lại.";
-      if (Platform.OS === 'web') window.alert(errorMsg);
-      else Alert.alert("Lỗi", errorMsg);
+      showToast(error.message || "Thanh toán thất bại. Vui lòng thử lại.", "error");
     } finally {
       setProcessing(false);
     }
@@ -137,6 +125,13 @@ export default function PaymentDetailScreen() {
       style={{ flex: 1 }}
     >
       <View style={[styles.container, darkMode && { backgroundColor: "#111827" }]}>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onHide={() => setToast(null)}
+          />
+        )}
         {/* HEADER */}
         <View style={[styles.header, darkMode && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -209,53 +204,85 @@ export default function PaymentDetailScreen() {
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Tên chủ thẻ</Text>
                 <TextInput
-                  style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                  style={[
+                    styles.input,
+                    darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" },
+                    formErrors.cardHolder && { borderColor: '#EF4444' }
+                  ]}
                   placeholder="NGUYEN VAN A"
                   placeholderTextColor="#64748B"
                   value={cardHolder}
-                  onChangeText={setCardHolder}
+                  onChangeText={(v) => {
+                    setCardHolder(v);
+                    if (formErrors.cardHolder) setFormErrors({...formErrors, cardHolder: null});
+                  }}
                   autoCapitalize="characters"
                 />
+                {formErrors.cardHolder && <Text style={styles.errorText}>{formErrors.cardHolder}</Text>}
               </View>
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Số thẻ</Text>
                 <TextInput
-                  style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                  style={[
+                    styles.input,
+                    darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" },
+                    formErrors.cardNumber && { borderColor: '#EF4444' }
+                  ]}
                   placeholder="0000 0000 0000 0000"
                   placeholderTextColor="#64748B"
                   keyboardType="numeric"
                   value={cardNumber}
-                  onChangeText={setCardNumber}
+                  onChangeText={(v) => {
+                    setCardNumber(v);
+                    if (formErrors.cardNumber) setFormErrors({...formErrors, cardNumber: null});
+                  }}
                   maxLength={16}
                 />
+                {formErrors.cardNumber && <Text style={styles.errorText}>{formErrors.cardNumber}</Text>}
               </View>
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
                   <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>Hết hạn (MM/YY)</Text>
                   <TextInput
-                    style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                    style={[
+                      styles.input,
+                      darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" },
+                      formErrors.expiry && { borderColor: '#EF4444' }
+                    ]}
                     placeholder="12/25"
                     placeholderTextColor="#64748B"
                     keyboardType="numeric"
                     value={expiry}
-                    onChangeText={setExpiry}
+                    onChangeText={(v) => {
+                      setExpiry(v);
+                      if (formErrors.expiry) setFormErrors({...formErrors, expiry: null});
+                    }}
                     maxLength={5}
                   />
+                  {formErrors.expiry && <Text style={styles.errorText}>{formErrors.expiry}</Text>}
                 </View>
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
                   <Text style={[styles.inputLabel, darkMode && { color: "#9CA3AF" }]}>CVV</Text>
                   <TextInput
-                    style={[styles.input, darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" }]}
+                    style={[
+                      styles.input,
+                      darkMode && { backgroundColor: "#111827", color: "#fff", borderColor: "#374151" },
+                      formErrors.cvv && { borderColor: '#EF4444' }
+                    ]}
                     placeholder="123"
                     placeholderTextColor="#64748B"
                     keyboardType="numeric"
                     secureTextEntry
                     value={cvv}
-                    onChangeText={setCvv}
+                    onChangeText={(v) => {
+                      setCvv(v);
+                      if (formErrors.cvv) setFormErrors({...formErrors, cvv: null});
+                    }}
                     maxLength={3}
                   />
+                  {formErrors.cvv && <Text style={styles.errorText}>{formErrors.cvv}</Text>}
                 </View>
               </View>
 
@@ -357,6 +384,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#1E293B',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
   },
   row: { flexDirection: 'row' },
   payNowBtn: {
