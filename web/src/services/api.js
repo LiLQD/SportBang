@@ -47,15 +47,20 @@ export const adminService = {
 export const fieldService = {
   getMyFields: () => api.get('/fields/owner/my-fields'),
   getAllFields: () => api.get('/fields'), // Admin dùng cái này
+  getFieldById: (id) => api.get(`/fields/${id}`),
   createField: (data) => api.post('/fields', data),
   updateField: (id, data) => api.put(`/fields/${id}`, data),
   deleteField: (id) => api.delete(`/fields/${id}`),
+  // Slot management
+  addSlot: (fieldId, data) => api.post(`/fields/${fieldId}/slots`, data),
+  updateSlot: (fieldId, slotId, data) => api.put(`/fields/${fieldId}/slots/${slotId}`, data),
+  deleteSlot: (fieldId, slotId) => api.delete(`/fields/${fieldId}/slots/${slotId}`),
 };
 
 export const bookingService = {
   getOwnerBookings: () => api.get('/owner/bookings'),
   getAllBookings: () => api.get('/admin/bookings'),
-  updateStatus: (id, status) => api.patch(`/booking/${id}/status`, { status }),
+  updateStatus: (id, status) => api.patch(`/bookings/${id}/status`, { status }),
 };
 
 export const notificationService = {

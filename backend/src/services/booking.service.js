@@ -203,8 +203,9 @@ const updateBookingStatus = async (id, status, user) => {
     throw new Error('Booking not found');
   }
 
-  // Check if user is owner of the field
-  if (user.role !== 'admin' && booking.field_id.owner_id.toString() !== user._id.toString()) {
+  // Kiểm tra quyền: Admin hoặc Chủ sân
+  const isOwner = booking.field_id && booking.field_id.owner_id.toString() === user._id.toString();
+  if (user.role !== 'admin' && !isOwner) {
     throw new Error('Not authorized to update this booking status');
   }
 

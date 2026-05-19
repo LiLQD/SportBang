@@ -39,11 +39,11 @@ export default function UserLayout() {
         }}
       />
 
-      {/* BOOKING */}
+      {/* BOOKINGS */}
       <Tabs.Screen
-        name="booking"
+        name="bookings"
         options={{
-          title: "Booking",
+          title: "Đơn đặt",
 
           tabBarIcon: ({ color, size }) => (
             <Ionicons
@@ -55,11 +55,11 @@ export default function UserLayout() {
         }}
       />
 
-      {/* NOTIFICATION */}
+      {/* NOTIFICATIONS */}
       <Tabs.Screen
-        name="notification"
+        name="notifications"
         options={{
-          title: "Notification",
+          title: "Thông báo",
 
           tabBarIcon: ({ color, size }) => (
             <Ionicons

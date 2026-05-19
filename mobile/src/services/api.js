@@ -10,16 +10,24 @@ export const setAuthToken = (token) => {
   authToken = token;
 };
 
-// Tự động chọn URL dựa trên nền tảng đang chạy
+// Tự động chọn URL dựa trên nền tảng và môi trường
 const getBaseUrl = () => {
   if (Platform.OS === "web") {
-    // Nếu chạy web, dùng localhost và port 3000 của backend
     return "http://localhost:3000/api";
   }
-  // Dùng IP của máy tính để điện thoại thật có thể kết nối qua Wi-Fi
-  // Đảm bảo IP 192.168.1.98 đúng là IP máy tính của bạn (kiểm tra bằng ipconfig)
-  // Đảm bảo port 3000 đã được mở trên Firewall (Tường lửa)
-  return "http://192.168.1.98:3000/api";
+
+  // 1. Ưu tiên dùng Ngrok URL từ file .env (nếu đã cấu hình)
+  if (process.env.EXPO_PUBLIC_API_URL && !process.env.EXPO_PUBLIC_API_URL.includes("DA_DANG_KY_NGROK")) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // 2. Dùng IP dự phòng từ file .env
+  if (process.env.EXPO_PUBLIC_FALLBACK_IP) {
+    return process.env.EXPO_PUBLIC_FALLBACK_IP;
+  }
+
+  // 3. Cuối cùng là giá trị mặc định cứng (fallback cuối cùng)
+  return "http://192.168.100.11:3000/api";
 };
 
 const BASE_URL = getBaseUrl();

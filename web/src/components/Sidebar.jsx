@@ -31,7 +31,7 @@ const Sidebar = () => {
   };
 
   const commonItems = [
-    { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
+    { name: 'Dashboard', path: role === 'admin' ? '/admin/dashboard' : '/owner/dashboard', icon: <LayoutDashboard size={20} /> },
     {
       name: 'Notifications',
       path: '/notifications',
@@ -49,14 +49,14 @@ const Sidebar = () => {
   ];
 
   const adminItems = [
-    { name: 'User Management', path: '/users', icon: <UsersIcon size={20} /> },
-    { name: 'System Pitches', path: '/pitches', icon: <MapPin size={20} /> },
-    { name: 'All Bookings', path: '/bookings', icon: <Calendar size={20} /> },
+    { name: 'User Management', path: '/admin/users', icon: <UsersIcon size={20} /> },
+    { name: 'System Pitches', path: '/admin/fields', icon: <MapPin size={20} /> },
+    { name: 'All Bookings', path: '/admin/bookings', icon: <Calendar size={20} /> },
   ];
 
   const ownerItems = [
-    { name: 'My Pitches', path: '/pitches', icon: <MapPin size={20} /> },
-    { name: 'Pitch Reservations', path: '/bookings', icon: <Calendar size={20} /> },
+    { name: 'My Pitches', path: '/owner/fields', icon: <MapPin size={20} /> },
+    { name: 'Pitch Reservations', path: '/owner/bookings', icon: <Calendar size={20} /> },
   ];
 
   const menuItems = role === 'admin'

@@ -26,8 +26,11 @@ const Login = () => {
         throw new Error('Dữ liệu phản hồi từ máy chủ không hợp lệ.');
       }
 
-      // KIỂM TRA QUYỀN
-      if (user.role !== 'admin' && user.role !== 'owner') {
+      // Chuẩn hóa role về chữ thường để so sánh
+      const role = user.role ? user.role.toLowerCase() : '';
+
+      // KIỂM TRA QUYỀN: Chấp nhận cả admin và owner
+      if (role !== 'admin' && role !== 'owner') {
         setError('Tài khoản này không có quyền truy cập trang quản trị.');
         setLoading(false);
         return;
@@ -35,11 +38,11 @@ const Login = () => {
 
       // Lưu thông tin vào localStorage
       localStorage.setItem('token', token);
-      localStorage.setItem('role', user.role);
+      localStorage.setItem('role', role);
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Điều hướng về trang chủ (Dashboard sẽ tự xử lý hiển thị theo role)
-      navigate('/');
+      // Ép trình duyệt tải lại trang chủ để App.jsx nhận state mới nhất
+      window.location.assign('/');
     } catch (err) {
       console.error('Login error:', err);
       setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại kết nối.');
